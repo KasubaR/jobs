@@ -6,6 +6,7 @@ use App\Collectors\Contracts\Collector;
 use App\Models\RawJobPost;
 use App\Models\Source;
 use App\Models\SourceRun;
+use App\Models\SourceRunError;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -47,22 +48,41 @@ abstract class BaseCollector implements Collector
         return $run;
     }
 
-    /** Problems that did not stop the run (for example one page failed). A run with any is 'partial'. */
-    protected array $warnings = [];
+    /**
+     * Problems that did not stop the run (one page failed, one ad could not be stored).
+     * Each is saved as a source_run_errors row; a run with any is 'partial'.
+     *
+     * @var list<array{stage:string,url:?string,message:string}>
+     */
+    protected array $problems = [];
+
+    /** At most this many error rows are saved per run, so a broken site cannot flood the table. */
+    private const MAX_ERROR_ROWS = 200;
+
+    /** Stages whose problems mean "an ad we found could not be collected". */
+    private const AD_STAGES = ['ad_page', 'store'];
 
     /** True while check() is running: collectors should do the smallest possible look (one page, no detail pages). */
     protected bool $probing = false;
 
+    /** Note something that went wrong without stopping the run. */
+    protected function problem(string $stage, ?string $url, string $message): void
+    {
+        $this->problems[] = ['stage' => $stage, 'url' => $url, 'message' => $message];
+    }
+
     private function execute(Source $source, string $trigger): SourceRun
     {
-        $this->warnings = [];
+        $this->problems = [];
         $this->probing = false;
 
+        // Counts start at zero explicitly, so the returned run is complete even when it fails early.
         $run = SourceRun::create([
             'source_id' => $source->id,
             'started_at' => now(),
             'status' => 'running',
             'trigger' => $trigger,
+            'items_found' => 0, 'items_new' => 0, 'items_updated' => 0, 'items_unchanged' => 0, 'items_failed' => 0, 'http_errors' => 0,
         ]);
 
         try {
@@ -73,20 +93,64 @@ abstract class BaseCollector implements Collector
             return $this->fail($run, $e->getMessage());
         }
 
-        [$new, $updated] = $this->ingest($source, $run, $items);
+        $counts = $this->ingest($source, $run, $items);
+
+        $failedAds = count(array_filter($this->problems, fn ($p) => in_array($p['stage'], self::AD_STAGES, true)));
 
         $run->update([
             'finished_at' => now(),
-            'status' => $this->warnings ? 'partial' : 'success',
+            'status' => $this->problems ? 'partial' : 'success',
             'items_found' => count($items),
-            'items_new' => $new,
-            'items_updated' => $updated,
-            'error_message' => $this->warnings ? mb_substr(implode(' | ', $this->warnings), 0, 1000) : null,
+            'items_new' => $counts['new'],
+            'items_updated' => $counts['updated'],
+            'items_unchanged' => $counts['unchanged'],
+            'items_failed' => $failedAds,
+            'error_message' => $this->problems ? $this->summary() : null,
         ]);
 
+        $this->saveProblems($run);
         $source->update(['last_collection_at' => now()]);
 
         return $run;
+    }
+
+    /** Short text for the run list; the full detail is in source_run_errors. */
+    protected function summary(): string
+    {
+        $labels = ['listing' => 'Listing page failed', 'ad_page' => 'Ad page failed', 'store' => 'Could not store ad'];
+
+        $lines = array_map(function (array $p) use ($labels) {
+            $label = $labels[$p['stage']] ?? null;
+
+            return $label ? "{$label}".($p['url'] ? " ({$p['url']})" : '').": {$p['message']}" : $p['message'];
+        }, array_slice($this->problems, 0, 3));
+
+        $more = count($this->problems) - 3;
+
+        return mb_substr(implode(' | ', $lines).($more > 0 ? " | and {$more} more" : ''), 0, 1000);
+    }
+
+    protected function saveProblems(SourceRun $run): void
+    {
+        $rows = [];
+        foreach (array_slice($this->problems, 0, self::MAX_ERROR_ROWS) as $p) {
+            $rows[] = [
+                'source_run_id' => $run->id,
+                'source_url' => $p['url'] ? mb_substr($p['url'], 0, 500) : null,
+                'stage' => $p['stage'],
+                'message' => mb_substr($p['message'], 0, 2000),
+                'created_at' => now(),
+            ];
+        }
+
+        $extra = count($this->problems) - self::MAX_ERROR_ROWS;
+        if ($extra > 0) {
+            $rows[] = ['source_run_id' => $run->id, 'source_url' => null, 'stage' => 'other', 'message' => "{$extra} more problems were not listed.", 'created_at' => now()];
+        }
+
+        if ($rows) {
+            SourceRunError::insert($rows);
+        }
     }
 
     public function check(Source $source): AccessCheck
@@ -194,19 +258,23 @@ abstract class BaseCollector implements Collector
      * Store ads through the one shared path: email removal, retain_raw, hashing, versioning.
      *
      * @param  list<array{title:string,url:string,external_id:?string,content:string}>  $items
-     * @return array{0:int,1:int} [new, updated]
+     * @return array{new:int,updated:int,unchanged:int,failed:int}
      */
     protected function ingest(Source $source, SourceRun $run, array $items): array
     {
-        $new = $updated = 0;
+        $counts = ['new' => 0, 'updated' => 0, 'unchanged' => 0, 'failed' => 0];
 
         foreach ($items as $item) {
-            $result = $this->store($source, $run, $item);
-            $new += $result === 'new' ? 1 : 0;
-            $updated += $result === 'updated' ? 1 : 0;
+            // One ad that cannot be stored must not lose the rest of the run.
+            try {
+                $counts[$this->store($source, $run, $item)]++;
+            } catch (Throwable $e) {
+                $counts['failed']++;
+                $this->problem('store', $item['url'] ?? null, $e->getMessage());
+            }
         }
 
-        return [$new, $updated];
+        return $counts;
     }
 
     /** @return 'new'|'updated'|'unchanged' */
@@ -261,6 +329,10 @@ abstract class BaseCollector implements Collector
             'http_errors' => $httpErrors,
             'error_message' => mb_substr($message, 0, 1000),
         ]);
+
+        // Problems noted before the run failed (for example page 1 worked, then a crash) are kept too.
+        $this->problem('fetch', null, $message);
+        $this->saveProblems($run);
 
         return $run;
     }

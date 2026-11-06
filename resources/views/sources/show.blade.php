@@ -61,19 +61,8 @@
       <dt>Notes</dt><dd>{{ $source->notes ?: 'none' }}</dd>
     </dl>
   @elseif ($tab === 'runs' || $tab === 'errors')
-    <div class="tw"><table class="tbl">
-      <thead><tr><th>Started</th><th>Trigger</th><th>Status</th><th>Found</th><th>New</th><th>Updated</th>@if ($tab === 'errors')<th>HTTP errors</th><th>Error</th>@else<th>Duration</th>@endif</tr></thead>
-      <tbody>
-      @forelse ($runs as $run)
-        <tr><td class="nowrap">{{ $run->started_at->format('j M Y H:i') }}</td><td>{{ $run->trigger }}</td>
-          <td><span @class(['pill', 'bad' => $run->status === 'failed', 'warn' => $run->status === 'partial', 'mut' => $run->status === 'running'])>{{ $run->status }}</span></td>
-          <td>{{ $run->items_found }}</td><td>{{ $run->items_new }}</td><td>{{ $run->items_updated }}</td>
-          @if ($tab === 'errors')<td>{{ $run->http_errors }}</td><td>{{ $run->error_message }}</td>
-          @else<td>{{ $run->finished_at ? $run->started_at->diffInSeconds($run->finished_at).' s' : '-' }}</td>@endif</tr>
-      @empty
-        <tr><td colspan="9" class="empty">{{ $tab === 'errors' ? 'No errors.' : 'No runs yet.' }}</td></tr>
-      @endforelse
-      </tbody></table></div>
+    @if ($tab === 'errors')<p class="sub" style="margin-bottom:10px">Runs that failed or only partly worked. Open a run to see each problem.</p>@endif
+    @include('runs._table', ['runs' => $runs, 'showSource' => false])
     {{ $runs->links() }}
   @else
     <div class="tw"><table class="tbl">

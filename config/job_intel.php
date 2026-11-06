@@ -15,6 +15,9 @@ return [
     // the last value is reused for later failures).
     'retry_backoff_minutes' => [60, 360, 1440],
 
+    // A run still marked "running" after this many minutes is treated as dead and marked failed.
+    'stuck_run_minutes' => 30,
+
     // A source is switched off after this many failed runs in a row. A person must turn it back on.
     'max_consecutive_failures' => (int) env('JOB_INTEL_MAX_FAILURES', 5),
 

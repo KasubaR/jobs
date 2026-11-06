@@ -94,7 +94,11 @@ class SourceActionController extends Controller
             return back()->withInput()->with('error', 'Ad not added. '.$e->getMessage());
         }
 
-        return back()->with('status', $run->items_new > 0 ? 'Ad added.' : 'That ad is already stored, so nothing new was added.');
+        if ($run->status === 'failed') {
+            return back()->withInput()->with('error', 'Ad not added. '.$run->error_message);
+        }
+
+        return back()->with('status', $run->items_new + $run->items_updated > 0 ? 'Ad added.' : 'That ad is already stored, so nothing new was added.');
     }
 
     /** Try the extraction rules as typed in the form on stored ads. Reads the database only. */

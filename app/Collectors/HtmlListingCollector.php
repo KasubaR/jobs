@@ -61,7 +61,7 @@ class HtmlListingCollector extends BaseCollector
                 if ($page === 1) {
                     throw $e;
                 }
-                $this->warnings[] = "Listing page {$page} failed: {$e->getMessage()}";
+                $this->problem('listing', $url, "Page {$page}: {$e->getMessage()}");
                 break;
             }
 
@@ -161,7 +161,7 @@ class HtmlListingCollector extends BaseCollector
             try {
                 $page = new HtmlPage($this->body($this->get($source, $url, 'text/html,application/xhtml+xml')));
             } catch (CollectionFailed $e) {
-                $this->warnings[] = "Ad page failed ({$url}): {$e->getMessage()}";
+                $this->problem('ad_page', $url, $e->getMessage());
 
                 continue;
             }

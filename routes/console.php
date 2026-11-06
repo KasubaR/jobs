@@ -12,3 +12,6 @@ Schedule::command('collect:run')->everyFifteenMinutes()->withoutOverlapping();
 
 // Retention: clear raw ad text older than RAW_RETENTION_DAYS (default 90).
 Schedule::command('raw:purge')->dailyAt('03:00');
+
+// A run that died halfway would stay "running" forever: mark it failed so the source can back off.
+Schedule::command('runs:cleanup')->everyTenMinutes();

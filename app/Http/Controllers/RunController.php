@@ -26,4 +26,9 @@ class RunController extends Controller
 
         return view('runs.index', ['runs' => $runs, 'filters' => $filters, 'sources' => Source::orderBy('name')->pluck('name', 'id')]);
     }
+
+    public function show(SourceRun $run): View
+    {
+        return view('runs.show', ['run' => $run->load('source'), 'problems' => $run->errors()->orderBy('id')->get()]);
+    }
 }

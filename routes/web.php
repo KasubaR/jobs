@@ -31,6 +31,7 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
 
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('/runs', [RunController::class, 'index'])->name('runs.index');
+    Route::get('/runs/{run}', [RunController::class, 'show'])->name('runs.show');
 
     Route::resource('sources', SourceController::class);
     Route::prefix('sources/{source}')->name('sources.')->controller(SourceActionController::class)->group(function () {

@@ -82,22 +82,33 @@ class ManualSubmissionCollector extends BaseCollector
             'trigger' => 'manual',
         ]);
 
-        [$new, $updated] = $this->ingest($source, $run, [[
+        $this->problems = [];
+
+        $counts = $this->ingest($source, $run, [[
             'title' => $title,
             'url' => $url,
             'external_id' => null,
             'content' => $content,
         ]]);
 
+        $failed = $counts['failed'] > 0;
+
         $run->update([
             'finished_at' => now(),
-            'status' => 'success',
+            'status' => $failed ? 'failed' : 'success',
             'items_found' => 1,
-            'items_new' => $new,
-            'items_updated' => $updated,
+            'items_new' => $counts['new'],
+            'items_updated' => $counts['updated'],
+            'items_unchanged' => $counts['unchanged'],
+            'items_failed' => $counts['failed'],
+            'error_message' => $failed ? $this->summary() : null,
         ]);
 
-        $source->update(['last_collection_at' => now()]);
+        $this->saveProblems($run);
+
+        if (! $failed) {
+            $source->update(['last_collection_at' => now()]);
+        }
 
         return $run;
     }
