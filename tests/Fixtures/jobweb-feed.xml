@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+  <title>Jobs &#8211; Test Feed</title>
+  <link>https://feed.test</link>
+  <item>
+    <title>Budget Analyst at Example Charity</title>
+    <link>https://feed.test/jobs/budget-analyst/</link>
+    <pubDate>Fri, 06 Nov 2026 10:48:18 +0000</pubDate>
+    <guid isPermaLink="false">https://feed.test/?post_type=job_listing&#038;p=1001</guid>
+    <description><![CDATA[<p>Short summary.</p>]]></description>
+    <content:encoded><![CDATA[<p>Prepare budgets. Apply to hr@example.org by 30 November.</p><ul><li>Degree in Finance</li><li>3 years experience</li></ul>]]></content:encoded>
+  </item>
+  <item>
+    <title>Driver at Sample Mining</title>
+    <link>https://feed.test/jobs/driver/</link>
+    <pubDate>Thu, 05 Nov 2026 08:00:00 +0000</pubDate>
+    <guid isPermaLink="false">https://feed.test/?post_type=job_listing&#038;p=1002</guid>
+    <description><![CDATA[<p>Drive trucks.</p>]]></description>
+    <content:encoded><![CDATA[<p>Drive haul trucks on site in Solwezi.</p>]]></content:encoded>
+  </item>
+</channel>
+</rss>

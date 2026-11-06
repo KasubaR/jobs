@@ -1,0 +1,86 @@
+[
+  {
+    "source_name": "Go Zambia Jobs",
+    "website_url": "https://gozambiajobs.com/",
+    "job_listing_url": "https://gozambiajobs.com/jobs",
+    "source_type": "job_board",
+    "collection_method": "permitted_scraping",
+    "collection_frequency": "daily",
+    "access_status": "pending",
+    "last_collection": null,
+    "active": false,
+    "notes": "robots.txt allows everything except /rss/ and sets Crawl-delay 1. An RSS feed exists at /rss/jobs but robots.txt disallows it, so do NOT use it. HTML pages only, max 1 request/sec. No terms page found (404 on common paths). Ask for written permission."
+  },
+  {
+    "source_name": "Great Zambia Jobs",
+    "website_url": "https://greatzambiajobs.com/",
+    "job_listing_url": null,
+    "source_type": "job_board",
+    "collection_method": "manual",
+    "collection_frequency": "weekly",
+    "access_status": "restricted",
+    "last_collection": null,
+    "active": false,
+    "notes": "Terms (18 May 2016) explicitly prohibit robots, spiders, scraping, crawling and aggregating/copying content without express written consent. Do not collect unless consent is given in writing."
+  },
+  {
+    "source_name": "JobWeb Zambia",
+    "website_url": "https://jobwebzambia.com/",
+    "job_listing_url": "https://jobwebzambia.com/feed/?post_type=job_listing",
+    "source_type": "job_board",
+    "collection_method": "rss",
+    "collection_frequency": "daily",
+    "access_status": "pending",
+    "last_collection": null,
+    "active": false,
+    "notes": "WordPress RSS feed is live and not disallowed by robots.txt. Only a privacy policy and DMCA policy found, no anti-scraping clause and no permission either. Use the feed only, 1 request/sec or slower. Ask for written confirmation."
+  },
+  {
+    "source_name": "Job Search Zambia",
+    "website_url": "https://jobsearchzm.com/",
+    "job_listing_url": "https://jobsearchzm.com/job_listing-sitemap.xml",
+    "source_type": "job_board",
+    "collection_method": "pending_review",
+    "collection_frequency": "weekly",
+    "access_status": "pending",
+    "last_collection": null,
+    "active": false,
+    "notes": "robots.txt allows all. Terms forbid republishing, reproducing, copying or redistributing site material; bots not mentioned. /feed/ looks stale (last build 3 Jun 2025). Sitemap lists about 153 job listings. Needs written permission before use. The listing URL above is the sitemap."
+  },
+  {
+    "source_name": "Teaching Service Commission",
+    "website_url": "https://www.tsc.gov.zm/",
+    "job_listing_url": null,
+    "source_type": "government",
+    "collection_method": "manual",
+    "collection_frequency": "monthly",
+    "access_status": "pending",
+    "last_collection": null,
+    "active": false,
+    "notes": "Adverts are mostly PDFs (e.g. 17 Apr 2026 intake advert on tcz.ac.zm). Applications via teacher.tcz.ac.zm. Official site URL and terms unverified."
+  },
+  {
+    "source_name": "UN Jobs",
+    "website_url": "https://unjobs.org/",
+    "job_listing_url": null,
+    "source_type": "aggregator",
+    "collection_method": "manual",
+    "collection_frequency": "weekly",
+    "access_status": "restricted",
+    "last_collection": null,
+    "active": false,
+    "notes": "robots.txt: User-agent * Disallow /. Do not collect."
+  },
+  {
+    "source_name": "LinkedIn Jobs",
+    "website_url": "https://www.linkedin.com/jobs/",
+    "job_listing_url": null,
+    "source_type": "job_board",
+    "collection_method": "manual",
+    "collection_frequency": "weekly",
+    "access_status": "restricted",
+    "last_collection": null,
+    "active": false,
+    "notes": "Request for robots.txt met a CAPTCHA challenge. Terms prohibit scraping. Do not collect or try to get round the challenge."
+  }
+]
