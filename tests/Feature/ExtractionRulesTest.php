@@ -5,19 +5,16 @@ namespace Tests\Feature;
 use App\Extraction\ExtractionPreview;
 use App\Extraction\ExtractionRules;
 use App\Extraction\Extractor;
-use App\Filament\Resources\Sources\Pages\EditSource;
 use App\Models\RawJobPost;
 use App\Models\Source;
-use App\Models\User;
 use Database\Seeders\SourceSeeder;
-use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Livewire;
+use Tests\Concerns\SignsIn;
 use Tests\TestCase;
 
 class ExtractionRulesTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, SignsIn;
 
     private const RULES = [
         'title_separator' => ' at ',
@@ -166,58 +163,112 @@ class ExtractionRulesTest extends TestCase
 
     // ---- the form ----
 
-    private function openEdit(Source $source)
+    private function formData(array $extraction): array
     {
-        config(['job_intel.admin_email' => 'me@example.com']);
-        $this->actingAs(User::factory()->create(['email' => 'me@example.com']));
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-
-        return Livewire::test(EditSource::class, ['record' => $source->getRouteKey()]);
+        return [
+            'name' => 'JobWeb Zambia', 'source_type' => 'job_board', 'website_url' => 'https://jobwebzambia.com/',
+            'job_listing_url' => 'https://jobwebzambia.com/feed/?post_type=job_listing', 'collection_method' => 'rss',
+            'collector' => 'jobweb_feed', 'collection_frequency' => 'daily', 'min_interval_seconds' => 1,
+            'retain_raw' => '1', 'extraction' => $extraction,
+        ];
     }
+
+    private const FORM_RULES = [
+        'title_separator' => ' at ',
+        'date_formats' => 'j F Y, d/m/Y',
+        'fields' => [
+            ['field' => 'closing_date', 'pattern' => 'closing date:\s*(.+)'],
+            ['field' => 'location', 'pattern' => 'location:\s*([^\n]+)'],
+        ],
+    ];
 
     public function test_rules_typed_into_the_form_are_saved_on_the_source(): void
     {
+        $this->signIn();
         $source = $this->source();
 
-        $this->openEdit($source)
-            ->fillForm(['collector_config' => ['extraction' => self::RULES]])
-            ->call('save')
-            ->assertHasNoFormErrors();
+        $this->put("/sources/{$source->id}", $this->formData(self::FORM_RULES))->assertRedirect("/sources/{$source->id}");
 
         $saved = $source->fresh()->collector_config['extraction'];
         $this->assertSame(' at ', $saved['title_separator']);
+        $this->assertSame(['j F Y', 'd/m/Y'], $saved['date_formats']);
         $this->assertSame('closing_date', $saved['fields'][0]['field']);
+    }
+
+    public function test_the_saved_rules_are_shown_again_in_the_form(): void
+    {
+        $this->signIn();
+        $source = $this->source();
+        $this->put("/sources/{$source->id}", $this->formData(self::FORM_RULES));
+
+        $this->get("/sources/{$source->id}/edit")->assertOk()->assertSee('j F Y, d/m/Y')->assertSee('closing date:', false);
     }
 
     public function test_an_invalid_pattern_in_the_form_blocks_saving(): void
     {
+        $this->signIn();
         $source = $this->source();
 
-        $this->openEdit($source)
-            ->fillForm(['collector_config' => ['extraction' => ['fields' => [['field' => 'location', 'pattern' => '(a+)+b']]]]])
-            ->call('save')
-            ->assertHasFormErrors();
+        $this->put("/sources/{$source->id}", $this->formData(['fields' => [['field' => 'location', 'pattern' => '(a+)+b']]]))
+            ->assertSessionHasErrors('extraction');
 
         $this->assertNull($source->fresh()->collector_config);
     }
 
-    public function test_preview_action_can_be_opened_and_the_view_shows_the_results(): void
+    public function test_blank_pattern_rows_are_ignored_but_half_filled_ones_are_rejected(): void
     {
+        $this->signIn();
+        $source = $this->source();
+
+        $this->put("/sources/{$source->id}", $this->formData(['fields' => [['field' => '', 'pattern' => '']]]))->assertRedirect();
+        $this->assertNull($source->fresh()->collector_config);
+
+        $this->put("/sources/{$source->id}", $this->formData(['fields' => [['field' => 'location', 'pattern' => '']]]))->assertSessionHasErrors('extraction');
+    }
+
+    public function test_preview_endpoint_shows_results_for_the_rules_as_typed(): void
+    {
+        $this->signIn();
         $source = $this->source();
         $this->storedAd($source, 'Budget Analyst at World Vision', 'Closing date: 30 November 2026');
 
-        $this->openEdit($source)
-            ->fillForm(['collector_config' => ['extraction' => self::RULES]])
-            ->mountAction('previewExtraction')
-            ->assertActionMounted('previewExtraction');
+        $this->post("/sources/{$source->id}/preview", ['extraction' => self::FORM_RULES])
+            ->assertOk()
+            ->assertSee('Budget Analyst')
+            ->assertSee('World Vision')
+            ->assertSee('2026-11-30')
+            ->assertSee('Nothing was fetched');
+    }
 
-        $html = view('filament.sources.extraction-preview', [
-            'preview' => app(ExtractionPreview::class)->run($source, self::RULES),
-        ])->render();
+    public function test_preview_endpoint_reports_bad_rules_without_running_them(): void
+    {
+        $this->signIn();
+        $source = $this->source();
+        $this->storedAd($source, 'A at B', 'x');
 
-        $this->assertStringContainsString('Budget Analyst', $html);
-        $this->assertStringContainsString('World Vision', $html);
-        $this->assertStringContainsString('2026-11-30', $html);
-        $this->assertStringContainsString('Nothing was fetched', $html);
+        $this->post("/sources/{$source->id}/preview", ['extraction' => ['fields' => [['field' => 'location', 'pattern' => 'no group']]]])
+            ->assertOk()->assertSee('Fix these first');
+    }
+
+    public function test_preview_makes_no_network_request_and_needs_a_signed_in_admin(): void
+    {
+        \Illuminate\Support\Facades\Http::fake();
+        $source = $this->source();
+
+        $this->post("/sources/{$source->id}/preview", ['extraction' => self::FORM_RULES])->assertRedirect('/login');
+
+        $this->signIn();
+        $this->post("/sources/{$source->id}/preview", ['extraction' => self::FORM_RULES])->assertOk();
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_preview_escapes_ad_titles(): void
+    {
+        $this->signIn();
+        $source = $this->source();
+        $this->storedAd($source, '<script>alert(1)</script> at Evil', 'x');
+
+        $this->post("/sources/{$source->id}/preview", ['extraction' => self::FORM_RULES])
+            ->assertOk()->assertDontSee('<script>alert(1)</script>', false);
     }
 }

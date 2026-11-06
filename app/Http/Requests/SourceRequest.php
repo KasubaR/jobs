@@ -1,0 +1,77 @@
+<?php
+
+namespace App\Http\Requests;
+
+use App\Collectors\CollectorRegistry;
+use App\Collectors\Html\HtmlConfig;
+use App\Extraction\ExtractionRules;
+use App\Models\Source;
+use App\Support\SourceFormData;
+use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+
+/**
+ * Add / edit a source. Deliberately does NOT accept access_status or is_active:
+ * those change only through the logged "Decide access" and "Activate" actions.
+ */
+class SourceRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true; // the route middleware already limits this to the administrator
+    }
+
+    public function rules(): array
+    {
+        $source = $this->route('source');
+
+        return [
+            'name' => ['required', 'string', 'max:160'],
+            'source_type' => ['required', Rule::in(array_keys(Source::SOURCE_TYPES))],
+            'website_url' => ['required', 'url:http,https', 'max:255', Rule::unique('sources', 'website_url')->ignore($source?->id)],
+            'job_listing_url' => ['nullable', 'url:http,https', 'max:255'],
+            'collection_method' => ['required', Rule::in(array_keys(Source::METHODS))],
+            'collector' => ['nullable', Rule::in(array_keys(CollectorRegistry::COLLECTORS))],
+            'collection_frequency' => ['required', Rule::in(array_keys(Source::FREQUENCIES))],
+            'min_interval_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
+            'retain_raw' => ['sometimes', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ];
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator) {
+            if ($this->input('collector') === 'html_listing') {
+                foreach (HtmlConfig::validate(SourceFormData::html($this->all())) as $problem) {
+                    $validator->errors()->add('html', $problem);
+                }
+            }
+
+            foreach (ExtractionRules::validate(SourceFormData::extraction($this->all())) as $problem) {
+                $validator->errors()->add('extraction', $problem);
+            }
+        }];
+    }
+
+    /** Fields that may be written to the source. */
+    public function sourceData(): array
+    {
+        $data = $this->validated();
+
+        return [
+            'name' => $data['name'],
+            'source_type' => $data['source_type'],
+            'website_url' => $data['website_url'],
+            'job_listing_url' => $data['job_listing_url'] ?? null,
+            'collection_method' => $data['collection_method'],
+            'collector' => $data['collector'] ?? null,
+            'collection_frequency' => $data['collection_frequency'],
+            'min_interval_seconds' => (int) $data['min_interval_seconds'],
+            'retain_raw' => $this->boolean('retain_raw'),
+            'notes' => $data['notes'] ?? null,
+            'collector_config' => SourceFormData::config($this->all(), $data['collector'] ?? null),
+        ];
+    }
+}

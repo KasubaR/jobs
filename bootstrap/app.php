@@ -13,6 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(\App\Http\Middleware\NoIndex::class);
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'two-factor' => \App\Http\Middleware\RequireTwoFactor::class,
+        ]);
+        $middleware->redirectGuestsTo(fn () => route('login'));
+        // The title separator is " at ": its spaces matter, so do not trim them.
+        $middleware->trimStrings(except: ['extraction.title_separator']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

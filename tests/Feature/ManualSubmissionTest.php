@@ -3,24 +3,21 @@
 namespace Tests\Feature;
 
 use App\Collectors\ManualSubmissionCollector;
-use App\Filament\Resources\Sources\Pages\ListSources;
 use App\Models\RawJobPost;
 use App\Models\Source;
 use App\Models\SourceRun;
-use App\Models\User;
 use App\Services\SourceManager;
 use Database\Seeders\SourceSeeder;
 use DomainException;
-use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-use Livewire\Livewire;
 use RuntimeException;
+use Tests\Concerns\SignsIn;
 use Tests\TestCase;
 
 class ManualSubmissionTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, SignsIn;
 
     protected function setUp(): void
     {
@@ -166,23 +163,48 @@ class ManualSubmissionTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_add_ad_action_appears_only_for_ready_manual_sources_and_stores_the_ad(): void
+    public function test_the_add_ad_button_appears_only_for_ready_manual_sources(): void
     {
-        config(['job_intel.admin_email' => 'me@example.com']);
-        $this->actingAs(User::factory()->create(['email' => 'me@example.com']));
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->signIn();
 
         $notReady = $this->tsc(false);
-        Livewire::test(ListSources::class)->assertTableActionHidden('addAd', $notReady);
+        $this->get("/sources/{$notReady->id}")->assertOk()->assertDontSee('Add ad')->assertDontSee('Run now');
 
         $ready = $this->tsc();
-        Livewire::test(ListSources::class)
-            ->assertTableActionVisible('addAd', $ready)
-            ->assertTableActionHidden('addAd', Source::where('name', 'JobWeb Zambia')->first())
-            ->assertTableActionHidden('runNow', $ready)
-            ->callTableAction('addAd', $ready, data: ['title' => 'Teacher at TSC', 'url' => '', 'content' => 'Apply now.'])
-            ->assertHasNoTableActionErrors();
+        $this->get("/sources/{$ready->id}")->assertOk()->assertSee('Add ad')->assertDontSee('Run now');
 
-        $this->assertSame(1, RawJobPost::where('source_id', $ready->id)->count());
+        $jobweb = Source::where('name', 'JobWeb Zambia')->first();
+        $this->get("/sources/{$jobweb->id}")->assertOk()->assertDontSee('Add ad');
+    }
+
+    public function test_adding_an_ad_through_the_page_stores_it(): void
+    {
+        $this->signIn();
+        $ready = $this->tsc();
+
+        $this->post("/sources/{$ready->id}/ads", ['title' => 'Teacher at TSC', 'url' => '', 'content' => 'Apply now. hr@tsc.example'])
+            ->assertSessionHas('status');
+
+        $post = RawJobPost::where('source_id', $ready->id)->first();
+        $this->assertSame('Teacher at TSC', $post->raw_title);
+        $this->assertStringNotContainsString('hr@tsc.example', $post->raw_content);
+        Http::assertNothingSent();
+    }
+
+    public function test_adding_an_ad_is_validated_and_refused_for_unready_or_automatic_sources(): void
+    {
+        $this->signIn();
+        $ready = $this->tsc();
+
+        $this->post("/sources/{$ready->id}/ads", ['title' => '', 'content' => ''])->assertSessionHasErrors(['title', 'content']);
+        $this->post("/sources/{$ready->id}/ads", ['title' => 'x', 'content' => 'y', 'url' => 'javascript:alert(1)'])->assertSessionHasErrors('url');
+
+        $pending = Source::where('name', 'Teaching Service Commission')->first();
+        app(SourceManager::class)->deactivate($pending);
+        $this->post("/sources/{$pending->id}/ads", ['title' => 'x', 'content' => 'y'])->assertSessionHas('error');
+
+        $jobweb = Source::where('name', 'JobWeb Zambia')->first();
+        $this->post("/sources/{$jobweb->id}/ads", ['title' => 'x', 'content' => 'y'])->assertSessionHas('error');
+        $this->assertSame(0, RawJobPost::count());
     }
 }

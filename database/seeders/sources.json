@@ -4,7 +4,7 @@
     "website_url": "https://gozambiajobs.com/",
     "job_listing_url": "https://gozambiajobs.com/jobs",
     "source_type": "job_board",
-    "collection_method": "permitted_scraping",
+    "collection_method": "html",
     "collection_frequency": "daily",
     "access_status": "pending",
     "last_collection": null,

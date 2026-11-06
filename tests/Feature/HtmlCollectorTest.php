@@ -15,7 +15,7 @@ use Tests\TestCase;
 /** Uses synthetic pages in tests/Fixtures/html. No real website is contacted. */
 class HtmlCollectorTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Concerns\SignsIn;
 
     private const HTML = [
         'item' => 'li.job-card',
@@ -265,35 +265,56 @@ class HtmlCollectorTest extends TestCase
 
     // ---- the form ----
 
-    private function openEdit(Source $source)
+    private function formData(array $html): array
     {
-        config(['job_intel.admin_email' => 'me@example.com']);
-        $this->actingAs(\App\Models\User::factory()->create(['email' => 'me@example.com']));
-        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
-
-        return \Livewire\Livewire::test(\App\Filament\Resources\Sources\Pages\EditSource::class, ['record' => $source->getRouteKey()]);
+        return [
+            'name' => 'Example Board', 'source_type' => 'job_board', 'website_url' => 'https://board.test/',
+            'job_listing_url' => 'https://board.test/jobs', 'collection_method' => 'html', 'collector' => 'html_listing',
+            'collection_frequency' => 'daily', 'min_interval_seconds' => 1, 'retain_raw' => '1', 'html' => $html,
+        ];
     }
 
     public function test_html_settings_are_saved_from_the_form(): void
     {
+        $this->signIn();
         $source = $this->source([], ['is_active' => false, 'access_status' => 'pending', 'collector_config' => null]);
 
-        $this->openEdit($source)
-            ->fillForm(['collector_config' => ['html' => self::HTML + ['max_pages' => 2]]])
-            ->call('save')
-            ->assertHasNoFormErrors();
+        $this->put("/sources/{$source->id}", $this->formData(self::HTML + ['max_pages' => 2, 'fetch_detail' => '1']))
+            ->assertRedirect("/sources/{$source->id}");
 
-        $this->assertSame('li.job-card', $source->fresh()->collector_config['html']['item']);
+        $saved = $source->fresh()->collector_config['html'];
+        $this->assertSame('li.job-card', $saved['item']);
+        $this->assertSame(2, $saved['max_pages']);
+        $this->assertTrue($saved['fetch_detail']);
     }
 
-    public function test_a_bad_selector_in_the_form_blocks_saving(): void
+    public function test_the_saved_settings_appear_again_in_the_form(): void
     {
+        $this->signIn();
+        $source = $this->source();
+
+        $this->get("/sources/{$source->id}/edit")->assertOk()->assertSee('li.job-card')->assertSee('a.next');
+    }
+
+    public function test_a_bad_selector_or_limit_in_the_form_blocks_saving(): void
+    {
+        $this->signIn();
         $source = $this->source([], ['is_active' => false, 'access_status' => 'pending', 'collector_config' => null]);
 
-        $this->openEdit($source)
-            ->fillForm(['collector_config' => ['html' => ['item' => 'li..bad[[']]])
-            ->call('save')
-            ->assertHasFormErrors();
+        $this->put("/sources/{$source->id}", $this->formData(['item' => 'li..bad[[']))->assertSessionHasErrors('html');
+        $this->put("/sources/{$source->id}", $this->formData(self::HTML + ['max_pages' => 6]))->assertSessionHasErrors('html');
+        $this->put("/sources/{$source->id}", $this->formData([]))->assertSessionHasErrors('html');
+
+        $this->assertNull($source->fresh()->collector_config);
+    }
+
+    public function test_html_settings_are_ignored_for_other_collectors(): void
+    {
+        $this->signIn();
+        $source = $this->source([], ['is_active' => false, 'access_status' => 'pending', 'collector_config' => null]);
+
+        $this->put("/sources/{$source->id}", ['collector' => '', 'collection_method' => 'manual'] + $this->formData(['item' => 'li..bad[[']))
+            ->assertRedirect();
 
         $this->assertNull($source->fresh()->collector_config);
     }
