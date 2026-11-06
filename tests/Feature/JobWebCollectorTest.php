@@ -26,7 +26,11 @@ class JobWebCollectorTest extends TestCase
 
     private function fakeFeed(?string $xml = null): void
     {
-        Http::fake(['*' => Http::response($xml ?? file_get_contents(base_path('tests/Fixtures/jobweb-feed.xml')), 200)]);
+        Http::fake([
+            '*/robots.txt' => Http::response("User-agent: *
+Allow: /", 200),
+            '*' => Http::response($xml ?? file_get_contents(base_path('tests/Fixtures/jobweb-feed.xml')), 200),
+        ]);
     }
 
     protected function setUp(): void
@@ -53,12 +57,12 @@ class JobWebCollectorTest extends TestCase
         $this->assertStringContainsString('Degree in Finance', $post->raw_content);
     }
 
-    public function test_sends_an_honest_user_agent_with_contact_and_makes_one_request(): void
+    public function test_sends_an_honest_user_agent_with_contact_and_makes_only_robots_and_feed_requests(): void
     {
         $this->fakeFeed();
         app(JobWebFeedCollector::class)->collect($this->approvedSource());
 
-        Http::assertSentCount(1);
+        Http::assertSentCount(2); // robots.txt + the feed
         Http::assertSent(fn ($r) => str_contains($r->header('User-Agent')[0], 'JobIntelBot')
             && str_contains($r->header('User-Agent')[0], 'owner@example.com'));
     }
@@ -90,9 +94,15 @@ class JobWebCollectorTest extends TestCase
         $source = $this->approvedSource();
         $xml = file_get_contents(base_path('tests/Fixtures/jobweb-feed.xml'));
 
-        Http::fake(['*' => Http::sequence()
-            ->push($xml, 200)
-            ->push(str_replace('Drive haul trucks', 'Operate haul trucks', $xml), 200)]);
+        $feeds = [$xml, str_replace('Drive haul trucks', 'Operate haul trucks', $xml)];
+        Http::fake(function ($request) use (&$feeds) {
+            if (str_ends_with($request->url(), '/robots.txt')) {
+                return Http::response("User-agent: *
+Allow: /", 200);
+            }
+
+            return Http::response(array_shift($feeds) ?? '', 200);
+        });
 
         app(JobWebFeedCollector::class)->collect($source);
         $run = app(JobWebFeedCollector::class)->collect($source);
@@ -143,7 +153,7 @@ class JobWebCollectorTest extends TestCase
 
     public function test_http_error_is_recorded_as_a_failed_run_and_stores_nothing(): void
     {
-        Http::fake(['*' => Http::response('blocked', 403)]);
+        Http::fake(['*/robots.txt' => Http::response('', 404), '*' => Http::response('blocked', 403)]);
         $run = app(JobWebFeedCollector::class)->collect($this->approvedSource());
 
         $this->assertSame('failed', $run->status);

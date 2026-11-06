@@ -29,6 +29,7 @@ class SourceSeeder extends Seeder
                 'job_listing_url' => $row['job_listing_url'],
                 'source_type' => $row['source_type'],
                 'collection_method' => $row['collection_method'],
+                'collector' => $row['collector'] ?? null,
                 'collection_frequency' => $row['collection_frequency'],
                 'access_status' => $row['access_status'],
                 'access_decided_at' => $restricted ? now() : null,
