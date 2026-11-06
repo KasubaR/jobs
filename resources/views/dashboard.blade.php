@@ -3,6 +3,14 @@
 @section('heading', 'Dashboard')
 @section('subheading', 'How collection is going')
 @section('content')
+@if ($atRisk > 0)
+  <div class="alert warn" role="alert"><b>{{ number_format($atRisk) }} {{ Str::plural('ad', $atRisk) }} still {{ $atRisk === 1 ? 'waits' : 'wait' }} to be processed and {{ $atRisk === 1 ? 'is' : 'are' }} within 30 days of the {{ config('job_intel.raw_retention_days') }}-day limit.</b>
+    Raw ad text is cleared at that limit, so an ad that has not been processed by then keeps only its title, link and dates.</div>
+@endif
+@if ($processFailed > 0)
+  <div class="alert bad" role="alert">{{ number_format($processFailed) }} {{ Str::plural('ad', $processFailed) }} failed during processing.</div>
+@endif
+
 <section class="banner">
   <div class="bt">
     <div><h2>Welcome back</h2><span class="date">{{ now()->format('l, F j, Y') }}</span><p>Here is how your sources and collected ads are doing.</p></div>
@@ -22,7 +30,8 @@
   <div class="card stat" style="--c:#12a05c"><div class="top"><div class="ic"><svg class="i"><use href="#up"/></svg></div></div><b>{{ $runCount }}</b><div class="l">Runs this week</div><div class="s">Last 7 days</div>
     <div class="pr"><span>Completed</span><b>{{ $runOk }}/{{ $runCount }}</b></div><div class="tr"><i style="width:{{ $runCount ? round($runOk / $runCount * 100) : 0 }}%"></i></div></div>
   <div class="card stat" style="--c:#f97316"><div class="top"><div class="ic"><svg class="i"><use href="#box"/></svg></div></div><b>{{ number_format($adsTotal) }}</b><div class="l">Ads stored</div><div class="s">All sources</div>
-    <div class="pr"><span>With raw text</span><b>{{ number_format($rawKept) }}</b></div><div class="tr"><i style="width:{{ $adsTotal ? round($rawKept / $adsTotal * 100) : 0 }}%"></i></div></div>
+    <div class="pr"><span>Waiting to be processed</span><b>{{ number_format($waiting) }}</b></div><div class="tr"><i style="width:{{ $adsTotal ? round($waiting / $adsTotal * 100) : 0 }}%"></i></div>
+    <div class="pr"><span>With raw text kept</span><b>{{ number_format($rawKept) }}</b></div></div>
   <div class="card stat" style="--c:#8b2ff0"><div class="top"><div class="ic"><svg class="i"><use href="#gear"/></svg></div></div><b>{{ $noCollector }}</b><div class="l">Without a collector</div><div class="s">Cannot be collected yet</div>
     <div class="pr"><span>Share of sources</span><b>{{ $totalSources ? round($noCollector / $totalSources * 100) : 0 }}%</b></div><div class="tr"><i style="width:{{ $totalSources ? round($noCollector / $totalSources * 100) : 0 }}%"></i></div></div>
 </section>

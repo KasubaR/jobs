@@ -3,6 +3,7 @@
 namespace App\Collectors;
 
 use App\Collectors\Contracts\Collector;
+use App\Events\RawJobPostStored;
 use App\Models\RawJobPost;
 use App\Models\Source;
 use App\Models\SourceRun;
@@ -298,7 +299,8 @@ abstract class BaseCollector implements Collector
             ->where('source_url', $item['url'])
             ->exists();
 
-        RawJobPost::create([
+        $post = RawJobPost::create([
+            'processing_status' => 'pending', // waiting for the processing stage
             'source_id' => $source->id,
             'source_run_id' => $run->id,
             'source_url' => $item['url'],
@@ -312,6 +314,9 @@ abstract class BaseCollector implements Collector
             'first_seen_at' => now(),
             'last_seen_at' => now(),
         ]);
+
+        // The hand-off to processing: one event for every new or changed ad, and never for an unchanged one.
+        RawJobPostStored::dispatch($post->id, $hadEarlierVersion ? 'updated' : 'new');
 
         return $hadEarlierVersion ? 'updated' : 'new';
     }

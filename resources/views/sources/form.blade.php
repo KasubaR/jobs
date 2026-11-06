@@ -13,7 +13,8 @@
 @section('heading', $editing ? 'Edit source' : 'Add source')
 @section('subheading', $editing ? $source->name : 'Register a website to collect ads from')
 @section('content')
-<form id="source-form" method="POST" action="{{ $editing ? route('sources.update', $source) : route('sources.store') }}" novalidate>
+<form id="source-form" method="POST" action="{{ $editing ? route('sources.update', $source) : route('sources.store') }}" novalidate
+  @unless ($editing) data-suggestions='@json(\App\Models\Source::SUGGESTED_FREQUENCY)' data-frequency-labels='@json(\App\Models\Source::FREQUENCIES)' @endunless>
   @csrf
   @if ($editing) @method('PUT') @endif
 
@@ -38,7 +39,8 @@
       <select id="collector" name="collector"><option value="">None (cannot be collected yet)</option>@foreach ($collectors as $key)<option value="{{ $key }}" @selected(old('collector', $source->collector) === $key)>{{ $key }}</option>@endforeach</select>
       <span class="help">The code that knows this website. A new website needs a collector written for it.</span>@error('collector')<span class="err">{{ $message }}</span>@enderror</div>
     <div @class(['field', 'has-err' => $errors->has('collection_frequency')])><label for="collection_frequency">Frequency</label>
-      <select id="collection_frequency" name="collection_frequency" required>@foreach (\App\Models\Source::FREQUENCIES as $k => $v)<option value="{{ $k }}" @selected(old('collection_frequency', $source->collection_frequency) === $k)>{{ $v }}</option>@endforeach</select>@error('collection_frequency')<span class="err">{{ $message }}</span>@enderror</div>
+      <select id="collection_frequency" name="collection_frequency" required>@foreach (\App\Models\Source::FREQUENCIES as $k => $v)<option value="{{ $k }}" @selected(old('collection_frequency', $source->collection_frequency) === $k)>{{ $v }}</option>@endforeach</select>
+      <span class="help" id="frequency-hint">Busy job boards: every 6 hours. Career and government pages: daily. Rarely updated sources: every 2–3 days. It is only a suggestion.</span>@error('collection_frequency')<span class="err">{{ $message }}</span>@enderror</div>
     <div @class(['field', 'has-err' => $errors->has('min_interval_seconds')])><label for="min_interval_seconds">Minimum seconds between requests</label><input id="min_interval_seconds" name="min_interval_seconds" type="number" min="1" max="3600" required value="{{ old('min_interval_seconds', $source->min_interval_seconds ?? 1) }}"><span class="help">Never lower than the site's own Crawl-delay.</span>@error('min_interval_seconds')<span class="err">{{ $message }}</span>@enderror</div>
     <div class="field full"><label class="check"><input type="hidden" name="retain_raw" value="0"><input type="checkbox" name="retain_raw" value="1" @checked(old('retain_raw', $source->retain_raw ?? true))> Keep raw ad text for 90 days</label><span class="help">Turn off if the site refuses retention. Only the extracted fields are then kept.</span></div>
   </div>

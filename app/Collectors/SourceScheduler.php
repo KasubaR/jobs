@@ -35,9 +35,13 @@ class SourceScheduler
         $from = ($from ?? now())->copy();
 
         return match ($frequency) {
+            'every_6_hours' => $from->addHours(6),
+            'every_12_hours' => $from->addHours(12),
+            'every_2_days' => $from->addDays(2),
+            'every_3_days' => $from->addDays(3),
             'weekly' => $from->addWeek(),
             'monthly' => $from->addMonth(),
-            default => $from->addDay(),
+            default => $from->addDay(), // daily
         };
     }
 

@@ -11,7 +11,7 @@ class CollectCommand extends Command
 {
     protected $signature = 'collect:run {source? : Source id or name. Runs it now, even if not due.}';
 
-    protected $description = 'Collect new job ads from approved, active sources that are due';
+    protected $description = 'Collect now, in this process (not queued), from due sources or the named one. The scheduler uses collect:dispatch instead.';
 
     public function handle(CollectorRegistry $registry): int
     {
@@ -22,8 +22,7 @@ class CollectCommand extends Command
             $query->where(fn ($q) => $q->where('id', $named)->orWhere('name', $named));
         } else {
             // Manual sources are never collected on a schedule; ads are pasted in by hand.
-            $query->where('collection_method', '!=', 'manual');
-            $query->where(fn ($q) => $q->whereNull('next_collection_at')->orWhere('next_collection_at', '<=', now()));
+            $query->collectable()->due();
         }
 
         $sources = $query->get();

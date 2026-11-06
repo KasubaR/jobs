@@ -40,6 +40,13 @@ class DashboardController extends Controller
             'runCount' => $runCount,
             'runOk' => $runOk,
             'rawKept' => RawJobPost::whereNotNull('raw_content')->count(),
+            'waiting' => RawJobPost::pending()->count(),
+            'processFailed' => RawJobPost::where('processing_status', 'failed')->count(),
+            // Raw text is cleared at the retention limit. Ads that still wait for processing then lose it unprocessed.
+            'atRisk' => RawJobPost::pending()
+                ->whereNotNull('raw_content')
+                ->where('first_seen_at', '<', now()->subDays(max(1, (int) config('job_intel.raw_retention_days') - 30)))
+                ->count(),
             'days' => $days,
             'maxAds' => max(1, $days->max('ads')),
             'recentRuns' => SourceRun::with('source')->latest('id')->limit(5)->get(),

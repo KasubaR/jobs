@@ -65,17 +65,18 @@ class SourceActionController extends Controller
 
     public function run(Source $source): RedirectResponse
     {
-        if (! $source->is_active || $source->access_status !== 'approved' || $source->collection_method === 'manual') {
-            return back()->with('error', 'Only an approved, active, automatic source can be run.');
-        }
-
         try {
             $run = $this->manager->runNow($source);
-        } catch (RuntimeException $e) {
-            return back()->with('error', 'Cannot run: '.$e->getMessage());
+        } catch (DomainException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        $summary = "{$source->name}: {$run->status}. Found {$run->items_found}, new {$run->items_new}, updated {$run->items_updated}".($run->error_message ? ". {$run->error_message}" : '').'.';
+        // Normally the run happens in the background worker: say so, and point to the run list.
+        if (! $run) {
+            return back()->with('status', "{$source->name} is queued. It starts within about a minute; the result will appear under Collection runs. If it was already waiting or running, nothing new is added.");
+        }
+
+        $summary = "{$source->name}: {$run->status}. Discovered {$run->items_found}, new {$run->items_new}, changed {$run->items_updated}, unchanged {$run->items_unchanged}, failed {$run->items_failed}".($run->error_message ? ". {$run->error_message}" : '').'.';
 
         return back()->with($run->status === 'failed' ? 'error' : 'status', $summary);
     }

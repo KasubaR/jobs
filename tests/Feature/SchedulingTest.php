@@ -173,10 +173,10 @@ class SchedulingTest extends TestCase
 
     public function test_collection_is_checked_every_fifteen_minutes(): void
     {
-        $this->artisan('schedule:list')->expectsOutputToContain('collect:run')->assertSuccessful();
+        $this->artisan('schedule:list')->expectsOutputToContain('collect:dispatch')->assertSuccessful();
 
         $event = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
-            ->first(fn ($e) => str_contains($e->command, 'collect:run'));
+            ->first(fn ($e) => str_contains($e->command, 'collect:dispatch'));
         $this->assertSame('*/15 * * * *', $event->expression);
     }
 }

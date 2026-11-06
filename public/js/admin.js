@@ -46,6 +46,24 @@
     });
   });
 
+  // new source: suggest a frequency for the chosen type, until the person picks one themselves
+  var sourceForm = document.getElementById('source-form');
+  var typeSelect = document.getElementById('source_type');
+  var freqSelect = document.getElementById('collection_frequency');
+  if (sourceForm && sourceForm.dataset.suggestions && typeSelect && freqSelect) {
+    var suggestions = JSON.parse(sourceForm.dataset.suggestions);
+    var labels = JSON.parse(sourceForm.dataset.frequencyLabels);
+    var hint = document.getElementById('frequency-hint');
+    var chosen = false;
+    freqSelect.addEventListener('change', function () { chosen = true; });
+    typeSelect.addEventListener('change', function () {
+      var s = suggestions[typeSelect.value];
+      if (!s) return;
+      if (!chosen) freqSelect.value = s;
+      if (hint) hint.textContent = 'Suggested for this type of source: ' + labels[s].toLowerCase() + '. You can change it.';
+    });
+  }
+
   // show settings only for the chosen collector
   var collector = document.getElementById('collector');
   function syncCollector() {

@@ -84,6 +84,19 @@ class RobotsGuardTest extends TestCase
         $this->assertFalse($guard->allows('https://x.test/search?q=1&sort=new'));
     }
 
+    public function test_robots_txt_is_read_from_the_same_port_as_the_page(): void
+    {
+        Http::fake(['*' => Http::response('', 404)]);
+        $guard = app(RobotsGuard::class);
+
+        $guard->allows('http://x.test:8080/jobs');
+        $guard->allows('http://x.test/jobs');
+
+        Http::assertSent(fn ($r) => $r->url() === 'http://x.test:8080/robots.txt');
+        Http::assertSent(fn ($r) => $r->url() === 'http://x.test/robots.txt');
+        Http::assertSentCount(2); // two origins, two files
+    }
+
     public function test_empty_disallow_allows_everything(): void
     {
         $this->robots("User-agent: *\nDisallow:");

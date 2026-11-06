@@ -11,7 +11,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // The processing stage (cleaning, extraction, classification) replaces this binding.
+        // Until then ads simply stay "pending".
+        $this->app->bind(\App\Processing\RawPostProcessor::class, \App\Processing\PendingProcessor::class);
     }
 
     public function boot(): void

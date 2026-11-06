@@ -15,6 +15,14 @@ return [
     // the last value is reused for later failures).
     'retry_backoff_minutes' => [60, 360, 1440],
 
+    // Hand each stored or changed ad to the processing stage as a background job. Leave off until that
+    // stage exists: ads then wait as "pending" without queueing a job per ad (processing:dispatch can queue them later).
+    'processing_enabled' => (bool) env('PROCESSING_ENABLED', false),
+
+    // A background collection job is stopped after this many seconds (needs the pcntl extension; without it
+    // the stuck-run cleanup below still closes the run).
+    'collect_job_timeout' => (int) env('JOB_INTEL_COLLECT_TIMEOUT', 900),
+
     // A run still marked "running" after this many minutes is treated as dead and marked failed.
     'stuck_run_minutes' => 30,
 

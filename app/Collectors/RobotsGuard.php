@@ -43,7 +43,10 @@ class RobotsGuard
     {
         $host = parse_url($url, PHP_URL_HOST) ?: '';
         $scheme = parse_url($url, PHP_URL_SCHEME) ?: 'https';
-        $key = 'robots:'.strtolower($host);
+        $port = parse_url($url, PHP_URL_PORT);
+        // robots.txt belongs to one origin: scheme, host and port (a site on :8080 has its own file).
+        $origin = "{$scheme}://{$host}".($port ? ":{$port}" : '');
+        $key = 'robots:'.strtolower($origin);
 
         if ($cached = Cache::get($key)) {
             return $cached;
@@ -52,7 +55,7 @@ class RobotsGuard
         try {
             $response = Http::withUserAgent(UserAgent::make())
                 ->timeout(config('job_intel.http_timeout'))
-                ->get("{$scheme}://{$host}/robots.txt");
+                ->get("{$origin}/robots.txt");
         } catch (Throwable) {
             return $this->remember($key, ['mode' => 'disallow_all', 'rules' => [], 'delay' => null], now()->addMinutes(self::UNREACHABLE_RETRY_MINUTES));
         }

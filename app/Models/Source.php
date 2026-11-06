@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -26,9 +27,28 @@ class Source extends Model
     ];
 
     public const FREQUENCIES = [
+        'every_6_hours' => 'Every 6 hours',
+        'every_12_hours' => 'Every 12 hours',
         'daily' => 'Daily',
+        'every_2_days' => 'Every 2 days',
+        'every_3_days' => 'Every 3 days',
         'weekly' => 'Weekly',
         'monthly' => 'Monthly',
+    ];
+
+    /**
+     * Suggested starting frequency by type of source. Only a suggestion: the person chooses.
+     * Busy job boards change by the hour; career pages and government pages change daily;
+     * the rest rarely change.
+     */
+    public const SUGGESTED_FREQUENCY = [
+        'job_board' => 'every_6_hours',
+        'aggregator' => 'every_6_hours',
+        'company' => 'daily',
+        'ngo' => 'daily',
+        'government' => 'daily',
+        'education' => 'every_2_days',
+        'media' => 'every_2_days',
     ];
 
     public const ACCESS_STATUSES = [
@@ -64,6 +84,15 @@ class Source extends Model
                 );
             }
 
+            // A new frequency applies from the last successful collection, not from the old schedule.
+            // (A source that is backing off after failures keeps its back-off time.)
+            if ($source->exists && $source->isDirty('collection_frequency')
+                && $source->last_collection_at && (int) $source->consecutive_failures === 0
+                && ! $source->isDirty('next_collection_at')) {
+                $source->next_collection_at = app(\App\Collectors\SourceScheduler::class)
+                    ->nextAfterSuccess($source->collection_frequency, $source->last_collection_at);
+            }
+
             // Turning a source back on starts it fresh: no failure streak, due immediately.
             if ($source->exists && $source->isDirty('is_active') && $source->is_active) {
                 $source->consecutive_failures = 0;
@@ -91,6 +120,20 @@ class Source extends Model
                 ]);
             }
         });
+    }
+
+    /** Approved, switched on, and collected automatically (manual sources are never scheduled). */
+    public function scopeCollectable(Builder $query): Builder
+    {
+        return $query->where('is_active', true)
+            ->where('access_status', 'approved')
+            ->where('collection_method', '!=', 'manual');
+    }
+
+    /** Never collected yet, or the next collection time has come. */
+    public function scopeDue(Builder $query): Builder
+    {
+        return $query->where(fn ($q) => $q->whereNull('next_collection_at')->orWhere('next_collection_at', '<=', now()));
     }
 
     public function runs(): HasMany

@@ -31,7 +31,7 @@
     "job_listing_url": "https://jobwebzambia.com/feed/?post_type=job_listing",
     "source_type": "job_board",
     "collection_method": "rss",
-    "collection_frequency": "daily",
+    "collection_frequency": "every_6_hours",
     "access_status": "pending",
     "last_collection": null,
     "active": false,

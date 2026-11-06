@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Collectors\AccessCheck;
 use App\Collectors\CollectorRegistry;
 use App\Collectors\ManualSubmissionCollector;
+use App\Jobs\CollectSource;
 use App\Models\Source;
 use App\Models\SourceRun;
 use DomainException;
@@ -83,10 +84,25 @@ class SourceManager
         return $this->registry->for($source)->check($source);
     }
 
-    /** One manual collection right now. */
-    public function runNow(Source $source): SourceRun
+    /**
+     * Queue one collection of this source (the "Run now" button). It runs in the background
+     * worker; with the sync queue (tests, quick local use) it runs straight away.
+     *
+     * @return SourceRun|null the run, only when it has already happened (sync queue)
+     */
+    public function runNow(Source $source): ?SourceRun
     {
-        return $this->registry->for($source)->collect($source, 'manual');
+        if (! $source->is_active || $source->access_status !== 'approved' || $source->collection_method === 'manual') {
+            throw new DomainException('Only an approved, active, automatic source can be run.');
+        }
+
+        $before = (int) $source->runs()->max('id');
+
+        CollectSource::dispatch($source->id, 'manual');
+
+        return config('queue.default') === 'sync'
+            ? $source->runs()->where('id', '>', $before)->latest('id')->first()
+            : null;
     }
 
     /** Store one pasted-in ad for a manual source. */
