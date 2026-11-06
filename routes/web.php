@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RunController;
+use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\SourceActionController;
 use App\Http\Controllers\SourceController;
 use Illuminate\Support\Facades\Route;
@@ -22,8 +23,12 @@ Route::middleware(['auth', 'admin'])->prefix('two-factor')->name('two-factor.')-
     Route::get('recovery-codes', 'recovery')->name('recovery');
 });
 
-// ---- the app: password + authenticator code ----
+// ---- the app: password, plus the authenticator code when two-factor has been turned on ----
 Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
+    Route::get('/security', [SecurityController::class, 'show'])->name('security');
+    Route::post('/security/two-factor/disable', [SecurityController::class, 'disable'])->middleware('throttle:two-factor')->name('security.disable');
+    Route::post('/security/recovery-codes', [SecurityController::class, 'recoveryCodes'])->middleware('throttle:two-factor')->name('security.recovery');
+
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('/runs', [RunController::class, 'index'])->name('runs.index');
 

@@ -16,7 +16,7 @@ class TwoFactorController extends Controller
     public function challenge(Request $request): View|RedirectResponse
     {
         if (! $request->user()->hasTwoFactor()) {
-            return redirect()->route('two-factor.setup');
+            return redirect()->route('dashboard'); // two-factor is off: nothing to ask
         }
 
         return $request->session()->get('two_factor_passed')
@@ -64,9 +64,17 @@ class TwoFactorController extends Controller
 
     public function confirm(Request $request): RedirectResponse
     {
-        $data = $request->validate(['code' => ['required', 'string', 'max:16']]);
+        $data = $request->validate([
+            'code' => ['required', 'string', 'max:16'],
+            'current_password' => ['required', 'string', 'max:255'],
+        ]);
         $user = $request->user();
         $secret = $request->session()->get('two_factor_pending_secret');
+
+        // Turning two-factor on can lock the owner out, so someone who only holds a session cannot do it.
+        if (! \Illuminate\Support\Facades\Hash::check($data['current_password'], $user->password)) {
+            return back()->withErrors(['current_password' => 'That password is not right.']);
+        }
 
         if (! $secret || $user->hasTwoFactor()) {
             return redirect()->route('two-factor.setup');

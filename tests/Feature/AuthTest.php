@@ -76,13 +76,98 @@ class AuthTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_correct_password_goes_to_setup_when_no_second_factor_exists_yet(): void
+    public function test_two_factor_is_off_by_default_so_the_password_alone_opens_the_app(): void
     {
-        $this->user();
+        $user = $this->user();
+        $this->assertFalse($user->hasTwoFactor());
 
         $this->post('/login', ['email' => 'me@example.com', 'password' => 'correct-horse-battery'])->assertRedirect('/');
         $this->assertAuthenticated();
-        $this->get('/')->assertRedirect('/two-factor/setup');
+
+        foreach (['/', '/sources', '/runs', '/security'] as $path) {
+            $this->get($path)->assertOk();
+        }
+        $this->get('/two-factor')->assertRedirect('/'); // nothing to ask while it is off
+    }
+
+    public function test_the_security_page_shows_the_state_and_offers_to_turn_it_on(): void
+    {
+        $this->actingAs($this->user());
+
+        $this->get('/security')->assertOk()->assertSee('Two-factor is')->assertSee('off')->assertSee('Turn on two-factor');
+    }
+
+    public function test_turning_it_on_needs_the_password_too(): void
+    {
+        $user = $this->user();
+        $this->actingAs($user)->get('/two-factor/setup');
+        $secret = session('two_factor_pending_secret');
+
+        $this->post('/two-factor/setup', ['code' => $this->currentCode($secret), 'current_password' => 'wrong'])
+            ->assertSessionHasErrors('current_password');
+        $this->assertFalse($user->fresh()->hasTwoFactor());
+    }
+
+    public function test_once_on_it_is_required_at_the_next_sign_in_and_shows_as_on(): void
+    {
+        $user = $this->user();
+        $this->actingAs($user)->get('/two-factor/setup');
+        $secret = session('two_factor_pending_secret');
+        $this->post('/two-factor/setup', ['code' => $this->currentCode($secret), 'current_password' => 'correct-horse-battery']);
+
+        $this->get('/security')->assertOk()->assertSee('Two-factor is')->assertSee('on')->assertSee('Turn off');
+
+        $this->post('/logout');
+        $this->post('/login', ['email' => 'me@example.com', 'password' => 'correct-horse-battery']);
+        $this->get('/')->assertRedirect('/two-factor');
+        $this->get('/security')->assertRedirect('/two-factor');
+    }
+
+    public function test_turning_it_off_needs_the_password_and_clears_everything(): void
+    {
+        $user = $this->user(['app_authentication_secret' => $this->totpSecret]);
+        app(TwoFactor::class)->issueRecoveryCodes($user);
+        $this->actingAs($user)->withSession(['two_factor_passed' => true]);
+
+        $this->post('/security/two-factor/disable', ['current_password' => 'nope'])->assertSessionHasErrors('current_password');
+        $this->assertTrue($user->fresh()->hasTwoFactor());
+
+        $this->post('/security/two-factor/disable', ['current_password' => 'correct-horse-battery'])->assertRedirect('/security');
+
+        $fresh = $user->fresh();
+        $this->assertFalse($fresh->hasTwoFactor());
+        $this->assertNull($fresh->app_authentication_recovery_codes);
+        $this->get('/')->assertOk();
+    }
+
+    public function test_new_recovery_codes_need_the_password_and_replace_the_old_ones(): void
+    {
+        $user = $this->user(['app_authentication_secret' => $this->totpSecret]);
+        $old = app(TwoFactor::class)->issueRecoveryCodes($user);
+        $this->actingAs($user->fresh())->withSession(['two_factor_passed' => true]);
+
+        $this->post('/security/recovery-codes', ['current_password' => 'nope'])->assertSessionHasErrors('current_password');
+        $this->assertContains(hash('sha256', $old[0]), $user->fresh()->app_authentication_recovery_codes);
+
+        $this->post('/security/recovery-codes', ['current_password' => 'correct-horse-battery'])->assertRedirect('/two-factor/recovery-codes');
+        $this->get('/two-factor/recovery-codes')->assertOk();
+
+        $this->assertNotContains(hash('sha256', $old[0]), $user->fresh()->app_authentication_recovery_codes);
+        $this->assertCount(TwoFactor::RECOVERY_CODES, $user->fresh()->app_authentication_recovery_codes);
+    }
+
+    public function test_recovery_codes_cannot_be_requested_while_two_factor_is_off(): void
+    {
+        $this->actingAs($this->user())->post('/security/recovery-codes', ['current_password' => 'correct-horse-battery'])->assertNotFound();
+    }
+
+    public function test_security_actions_need_the_second_factor_when_it_is_on(): void
+    {
+        $user = $this->user(['app_authentication_secret' => $this->totpSecret]);
+        $this->actingAs($user); // password only, code not entered
+
+        $this->post('/security/two-factor/disable', ['current_password' => 'correct-horse-battery'])->assertRedirect('/two-factor');
+        $this->assertTrue($user->fresh()->hasTwoFactor());
     }
 
     public function test_a_password_alone_never_opens_the_app(): void
@@ -144,10 +229,10 @@ class AuthTest extends TestCase
         $secret = session('two_factor_pending_secret');
         $this->assertNotEmpty($secret);
 
-        $this->post('/two-factor/setup', ['code' => '123456'])->assertSessionHasErrors('code');
+        $this->post('/two-factor/setup', ['code' => '123456', 'current_password' => 'correct-horse-battery'])->assertSessionHasErrors('code');
         $this->assertNull($user->fresh()->app_authentication_secret);
 
-        $this->post('/two-factor/setup', ['code' => $this->currentCode($secret)])->assertRedirect('/two-factor/recovery-codes');
+        $this->post('/two-factor/setup', ['code' => $this->currentCode($secret), 'current_password' => 'correct-horse-battery'])->assertRedirect('/two-factor/recovery-codes');
         $this->assertSame($secret, $user->fresh()->app_authentication_secret);
 
         $this->get('/two-factor/recovery-codes')->assertOk()->assertSee('I have saved them');

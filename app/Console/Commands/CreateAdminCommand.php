@@ -43,7 +43,7 @@ class CreateAdminCommand extends Command
 
         $this->info($existed
             ? "Password updated for {$email}. Two-factor sign-in was left as it was."
-            : "Administrator {$email} created. On first sign-in you will be asked to set up two-factor sign-in.");
+            : "Administrator {$email} created. Two-factor sign-in is off; turn it on from the Security page if you want it.");
 
         return self::SUCCESS;
     }

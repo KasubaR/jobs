@@ -30,5 +30,5 @@
   <button class="btn primary" type="submit">Sign in</button>
 </form>
 
-<div class="auth-note"><svg class="i" aria-hidden="true"><use href="#shield"/></svg><span>After your password you will be asked for the 6-digit code from your authenticator app.</span></div>
+<div class="auth-note"><svg class="i" aria-hidden="true"><use href="#shield"/></svg><span>If you have turned on two-factor sign-in, you will be asked for the 6-digit code from your authenticator app next.</span></div>
 @endsection

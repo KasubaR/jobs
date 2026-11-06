@@ -22,7 +22,7 @@
     <ul class="auth-points">
       <li><span class="ic"><svg class="i"><use href="#shield"/></svg></span><div><b>Approved sources only</b><span>Nothing is collected until you decide a site is allowed.</span></div></li>
       <li><span class="ic"><svg class="i"><use href="#globe"/></svg></span><div><b>Every source in one list</b><span>Feeds, public pages and ads you add by hand.</span></div></li>
-      <li><span class="ic"><svg class="i"><use href="#lock"/></svg></span><div><b>Private by design</b><span>One person, a password and an authenticator code.</span></div></li>
+      <li><span class="ic"><svg class="i"><use href="#lock"/></svg></span><div><b>Private by design</b><span>One person, a password, and optional two-factor sign-in.</span></div></li>
     </ul>
   </div>
   <div class="auth-foot">Not listed in search engines.</div>
