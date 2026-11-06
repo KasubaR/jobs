@@ -14,7 +14,7 @@ use Throwable;
  *  - 4xx          -> no robots.txt exists, everything allowed
  *  - 5xx / error  -> unreachable, everything disallowed (retried after 15 minutes)
  *
- * Rules for our own token (JobIntelBot) win over the "*" group. The longest matching
+ * Rules for our own token (ZamtrendsBot) win over the "*" group. The longest matching
  * pattern wins; on a tie, Allow wins.
  */
 class RobotsGuard

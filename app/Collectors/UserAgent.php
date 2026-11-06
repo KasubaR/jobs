@@ -5,7 +5,7 @@ namespace App\Collectors;
 /** The one honest User-Agent every outgoing request uses. */
 final class UserAgent
 {
-    public const TOKEN = 'JobIntelBot';
+    public const TOKEN = 'ZamtrendsBot';
 
     public static function make(): string
     {

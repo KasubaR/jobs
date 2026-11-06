@@ -51,7 +51,7 @@ class RobotsGuardTest extends TestCase
 
     public function test_our_own_group_overrides_the_wildcard_group(): void
     {
-        $this->robots("User-agent: *\nDisallow: /\n\nUser-agent: JobIntelBot\nAllow: /\nDisallow: /secret");
+        $this->robots("User-agent: *\nDisallow: /\n\nUser-agent: ZamtrendsBot\nAllow: /\nDisallow: /secret");
         $guard = app(RobotsGuard::class);
 
         $this->assertTrue($guard->allows('https://x.test/jobs'));

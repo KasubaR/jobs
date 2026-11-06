@@ -1,4 +1,4 @@
-# jobs
+# Zamtrends
 
 Private Zambian job market intelligence platform. Single user, password + authenticator-app code, not indexed by search engines.
 

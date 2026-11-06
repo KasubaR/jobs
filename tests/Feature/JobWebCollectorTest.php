@@ -63,7 +63,7 @@ Allow: /", 200),
         app(JobWebFeedCollector::class)->collect($this->approvedSource());
 
         Http::assertSentCount(2); // robots.txt + the feed
-        Http::assertSent(fn ($r) => str_contains($r->header('User-Agent')[0], 'JobIntelBot')
+        Http::assertSent(fn ($r) => str_contains($r->header('User-Agent')[0], 'ZamtrendsBot')
             && str_contains($r->header('User-Agent')[0], 'owner@example.com'));
     }
 

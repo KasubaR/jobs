@@ -10,6 +10,17 @@
     try { localStorage.setItem('theme', dark ? 'light' : 'dark'); } catch (e) {}
   };
 
+  // show / hide a password
+  document.querySelectorAll('.reveal').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var input = document.getElementById(b.getAttribute('aria-controls'));
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      b.setAttribute('aria-pressed', show ? 'true' : 'false');
+      b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    });
+  });
+
   // mobile menu
   var side = document.getElementById('side');
   var menu = document.getElementById('menu');

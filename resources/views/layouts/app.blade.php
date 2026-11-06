@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow, noarchive">
-<title>@yield('title', 'Dashboard') · Job Intel</title>
+<title>@yield('title', 'Dashboard') · Zamtrends</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/admin.css') }}">
@@ -21,7 +21,7 @@
 @endphp
 <div class="app">
 <aside id="side">
-  <div class="brand"><div>Job Intel<small>Zambia labour market</small></div><button id="close" aria-label="Close menu" type="button">&times;</button></div>
+  <div class="brand"><div>Zamtrends<small>Zambia labour market</small></div><button id="close" aria-label="Close menu" type="button">&times;</button></div>
   <nav aria-label="Main">
     @foreach ($nav as [$route, $label, $icon, $match])
       <a href="{{ route($route) }}" @class(['on' => request()->routeIs($match)]) @if (request()->routeIs($match)) aria-current="page" @endif><svg class="i"><use href="#{{ $icon }}"/></svg>{{ $label }}</a>
