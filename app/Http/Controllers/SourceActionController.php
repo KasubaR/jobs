@@ -26,10 +26,10 @@ class SourceActionController extends Controller
     {
         $data = $request->validate([
             'status' => ['required', 'in:pending,approved,restricted'],
-            'note' => ['required', 'string', 'min:3', 'max:2000'],
+            'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $this->manager->decideAccess($source, $data['status'], $data['note']);
+        $this->manager->decideAccess($source, $data['status'], $data['note'] ?? null);
 
         return back()->with('status', "Access for {$source->name} set to {$data['status']}.");
     }

@@ -30,6 +30,8 @@ class SourceSeeder extends Seeder
                 'source_type' => $row['source_type'],
                 'collection_method' => $row['collection_method'],
                 'collector' => $row['collector'] ?? null,
+                'collector_config' => $row['collector_config'] ?? null,
+                'min_interval_seconds' => $row['min_interval_seconds'] ?? 1,
                 'collection_frequency' => $row['collection_frequency'],
                 'access_status' => $row['access_status'],
                 'access_decided_at' => $restricted ? now() : null,

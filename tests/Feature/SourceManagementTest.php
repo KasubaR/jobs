@@ -63,7 +63,7 @@ class SourceManagementTest extends TestCase
 
     public function test_cannot_activate_an_approved_source_without_a_collector(): void
     {
-        $source = Source::where('name', 'Go Zambia Jobs')->first();
+        $source = Source::where('name', 'Job Search Zambia')->first();
         app(SourceManager::class)->decideAccess($source, 'approved', 'Owner checked the terms.');
 
         $this->assertStringContainsString('No collector is assigned', implode(' ', app(SourceManager::class)->activationProblems($source->fresh())));
@@ -71,16 +71,18 @@ class SourceManagementTest extends TestCase
         app(SourceManager::class)->activate($source->fresh());
     }
 
-    public function test_deciding_access_needs_a_note_and_a_valid_status(): void
+    public function test_deciding_access_needs_a_valid_status_but_no_note(): void
     {
-        foreach ([['approved', '  '], ['maybe', 'note']] as [$status, $note]) {
-            try {
-                app(SourceManager::class)->decideAccess($this->jobweb(), $status, $note);
-                $this->fail('Expected a DomainException.');
-            } catch (DomainException) {
-                $this->assertSame('pending', $this->jobweb()->access_status);
-            }
+        try {
+            app(SourceManager::class)->decideAccess($this->jobweb(), 'maybe', 'note');
+            $this->fail('Expected a DomainException.');
+        } catch (DomainException) {
+            $this->assertSame('pending', $this->jobweb()->access_status);
         }
+
+        app(SourceManager::class)->decideAccess($this->jobweb(), 'approved', '  ');
+        $this->assertSame('approved', $this->jobweb()->access_status);
+        $this->assertNull($this->jobweb()->access_decision_note);
     }
 
     public function test_approving_and_activating_are_logged_with_the_user_and_note(): void
@@ -160,15 +162,15 @@ class SourceManagementTest extends TestCase
         $this->get("/sources/{$source->id}?tab=access")->assertOk()->assertSee('Checked the privacy policy.')->assertSee('me@example.com');
     }
 
-    public function test_decide_access_records_the_decision_and_needs_a_note(): void
+    public function test_decide_access_records_the_decision_without_a_note(): void
     {
         $source = $this->jobweb();
 
-        $this->post("/sources/{$source->id}/access", ['status' => 'approved', 'note' => ''])->assertSessionHasErrors('note');
-        $this->assertSame('pending', $this->jobweb()->access_status);
+        $this->post("/sources/{$source->id}/access", ['status' => 'approved'])->assertSessionHas('status');
+        $this->assertSame('approved', $this->jobweb()->access_status);
+        $this->assertNull($this->jobweb()->access_decision_note);
 
         $this->post("/sources/{$source->id}/access", ['status' => 'approved', 'note' => 'Checked terms today.'])->assertSessionHas('status');
-        $this->assertSame('approved', $this->jobweb()->access_status);
         $this->assertSame('Checked terms today.', $this->jobweb()->access_decision_note);
 
         $this->post("/sources/{$source->id}/access", ['status' => 'hacked', 'note' => 'x'])->assertSessionHasErrors('status');

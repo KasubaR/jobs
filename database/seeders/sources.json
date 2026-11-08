@@ -5,12 +5,26 @@
     "job_listing_url": "https://gozambiajobs.com/jobs",
     "source_type": "job_board",
     "collection_method": "html",
-    "collection_frequency": "daily",
+    "collection_frequency": "every_6_hours",
     "access_status": "pending",
     "last_collection": null,
     "active": false,
     "notes": "robots.txt allows everything except /rss/ and sets Crawl-delay 1. An RSS feed exists at /rss/jobs but robots.txt disallows it, so do NOT use it. HTML pages only, max 1 request/sec. No terms page found (404 on common paths). Ask for written permission.",
-    "collector": null
+    "collector": "html_listing",
+    "min_interval_seconds": 2,
+    "collector_config": {
+      "html": {
+        "item": "div.job-listings-item",
+        "link": "a[href^=\"/jobs/\"]",
+        "title": "h3",
+        "next": "a[rel=\"next\"]",
+        "fetch_detail": true,
+        "structured_data": true,
+        "max_pages": 2,
+        "max_items": 60,
+        "max_detail_requests": 20
+      }
+    }
   },
   {
     "source_name": "Great Zambia Jobs",

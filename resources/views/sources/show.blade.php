@@ -99,7 +99,6 @@
     <p class="sub">Approved means you checked the terms and robots.txt, or have permission. Anything other than Approved also switches the source off.</p>
     <div class="field" style="margin-top:14px"><label for="status">Decision</label>
       <select id="status" name="status" required>@foreach (Source::ACCESS_STATUSES as $k => $v)<option value="{{ $k }}" @selected($source->access_status === $k)>{{ $v }}</option>@endforeach</select></div>
-    <div class="field" style="margin-top:14px"><label for="note">What did you check, or who gave permission?</label><textarea id="note" name="note" required minlength="3" maxlength="2000"></textarea></div>
     <div class="acts"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">Save decision</button></div>
   </form>
 </dialog>

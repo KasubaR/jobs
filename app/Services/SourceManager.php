@@ -19,15 +19,13 @@ class SourceManager
     public function __construct(private CollectorRegistry $registry) {}
 
     /** Record an access decision. Anything but "approved" also switches the source off. */
-    public function decideAccess(Source $source, string $status, string $note): void
+    public function decideAccess(Source $source, string $status, ?string $note = null): void
     {
         if (! array_key_exists($status, Source::ACCESS_STATUSES)) {
             throw new DomainException("Unknown access status '{$status}'.");
         }
 
-        if (trim($note) === '') {
-            throw new DomainException('A note is required: say what you checked or who gave permission.');
-        }
+        $note = $note === null || trim($note) === '' ? null : trim($note);
 
         $source->decisionNote = $note;
         $source->update([
