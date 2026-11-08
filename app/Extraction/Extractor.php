@@ -26,7 +26,18 @@ class Extractor
         'salary_text' => 'Salary',
     ];
 
+    /** Fields only the processing stage reads (with the built-in label rules); not offered in the source form. */
+    public const EXTRA_FIELDS = [
+        'employer' => 'Employer',
+        'experience_text' => 'Experience',
+        'qualification_text' => 'Qualification',
+        'application_url' => 'Application link',
+    ];
+
     public const DATE_FIELDS = ['closing_date', 'posted_date'];
+
+    /** Date layouts understood when a source names none of its own (day first, as in Zambia). */
+    public const DEFAULT_DATE_FORMATS = ['j F Y', 'j M Y', 'F j Y', 'M j Y', 'd/m/Y', 'j/n/Y', 'Y-m-d', 'j n Y'];
 
     private const MAX_TEXT = 100_000;
 
@@ -36,8 +47,9 @@ class Extractor
      * @param  array<string, mixed>  $rules
      * @return array{title:?string, employer:?string, values:array<string,?string>, warnings:list<string>}
      */
-    public function extract(RawJobPost $post, array $rules): array
+    public function extract(RawJobPost $post, array $rules, ?array $allowed = null): array
     {
+        $allowed ??= self::FIELDS;
         $result = ['title' => $post->raw_title, 'employer' => null, 'values' => [], 'warnings' => []];
 
         $this->splitTitle($result, (string) ($rules['title_separator'] ?? ''));
@@ -52,11 +64,11 @@ class Extractor
 
         foreach (($rules['fields'] ?? []) as $rule) {
             $field = $rule['field'] ?? null;
-            if (! isset(self::FIELDS[$field]) || array_key_exists($field, $result['values']) && $result['values'][$field] !== null) {
+            if (! isset($allowed[$field]) || array_key_exists($field, $result['values']) && $result['values'][$field] !== null) {
                 continue; // first rule that matches wins
             }
 
-            $raw = $this->match((string) ($rule['pattern'] ?? ''), $text, $result['warnings']);
+            $raw = $this->match((string) ($rule['pattern'] ?? ''), $text, $result['warnings'], ($rule['built_in'] ?? false) === true);
             $result['values'][$field] = $raw === null ? null : $this->finish($field, $raw, $rules['date_formats'] ?? [], $result['warnings']);
         }
 
@@ -91,9 +103,9 @@ class Extractor
     }
 
     /** @param list<string> $warnings */
-    private function match(string $pattern, string $text, array &$warnings): ?string
+    private function match(string $pattern, string $text, array &$warnings, bool $builtIn = false): ?string
     {
-        if (ExtractionRules::patternProblem($pattern) !== null) {
+        if (ExtractionRules::patternProblem($pattern, $builtIn) !== null) {
             $warnings[] = "Skipped an invalid pattern: {$pattern}";
 
             return null;
@@ -121,17 +133,37 @@ class Extractor
             return mb_substr($raw, 0, 255);
         }
 
-        foreach ($formats as $format) {
-            $date = \DateTimeImmutable::createFromFormat('!'.$format, $raw);
-            $errors = \DateTimeImmutable::getLastErrors(); // false when there were no problems (PHP 8.2+)
-
-            // A warning means PHP "fixed" the input, e.g. 31/02 -> 3 March. Treat that as unreadable.
-            if ($date !== false && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))) {
-                return $date->format('Y-m-d');
-            }
+        if ($date = self::parseDate($raw, $formats)) {
+            return $date;
         }
 
         $warnings[] = "Could not read the date '{$raw}' with the given formats.";
+
+        return null;
+    }
+
+    /**
+     * A date written by a person, as Y-m-d, or null. Tries the text as it is, then with ordinals ("30th"),
+     * commas and dashes/dots between the parts tidied, so "30th November, 2026" and "30-11-2026" read too.
+     *
+     * @param  list<string>  $formats
+     */
+    public static function parseDate(string $raw, array $formats): ?string
+    {
+        $tidy = trim(preg_replace('/\s+/', ' ', str_replace(',', ' ', preg_replace('/(\d)(?:st|nd|rd|th)\b/i', '$1', $raw))));
+        $candidates = array_values(array_unique([$raw, $tidy, preg_replace('/\s+/', ' ', preg_replace('/[\-.]+/', ' ', $tidy))]));
+
+        foreach ($candidates as $text) {
+            foreach ($formats as $format) {
+                $date = \DateTimeImmutable::createFromFormat('!'.$format, $text);
+                $errors = \DateTimeImmutable::getLastErrors(); // false when there were no problems (PHP 8.2+)
+
+                // A warning means PHP "fixed" the input, e.g. 31/02 -> 3 March. Treat that as unreadable.
+                if ($date !== false && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))) {
+                    return $date->format('Y-m-d');
+                }
+            }
+        }
 
         return null;
     }

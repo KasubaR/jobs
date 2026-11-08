@@ -181,13 +181,14 @@ class ProcessingHandoffTest extends TestCase
     public function test_it_is_off_by_default(): void
     {
         $this->assertFalse(config('job_intel.processing_enabled'));
-        $this->assertInstanceOf(PendingProcessor::class, app(RawPostProcessor::class));
+        $this->assertInstanceOf(\App\Processing\ExtractionProcessor::class, app(RawPostProcessor::class));
     }
 
     // ---- the job ----
 
     public function test_the_placeholder_leaves_the_ad_pending_and_loses_nothing(): void
     {
+        $this->app->bind(RawPostProcessor::class, PendingProcessor::class);
         $post = $this->ad($this->jobweb());
 
         ProcessRawJobPost::dispatchSync($post->id);

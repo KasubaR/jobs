@@ -98,7 +98,17 @@ In the app a source uses **Collection method = Python worker** and **Collector =
 
 ## Handing ads on for processing
 
-Every new or changed ad is stored as `pending` and raises a `RawJobPostStored` event. The cleaning, extraction and classification stage plugs in by implementing `App\Processing\RawPostProcessor` and binding it in `AppServiceProvider` in place of the placeholder (which leaves ads pending). Set `PROCESSING_ENABLED=true` once it exists: each ad then gets a background `ProcessRawJobPost` job, and `processing:dispatch` queues the ads that were waiting. Raw ad text is cleared 90 days after an ad is first seen whether or not it was processed; the dashboard warns when waiting ads are within 30 days of that.
+Every new or changed ad is stored as `pending` and raises a `RawJobPostStored` event. Set `PROCESSING_ENABLED=true` to switch the processing stage on: each ad then gets a background `ProcessRawJobPost` job, and `processing:dispatch` queues the ads that were waiting (run it once after switching on, to take in the ads already stored). Raw ad text is cleared 90 days after an ad is first seen whether or not it was processed; the dashboard warns when waiting ads are within 30 days of that.
+
+### Reading an ad into a job (Phase 6, step 1)
+
+`App\Processing\ExtractionProcessor` turns each stored ad into one `jobs` record (title, employer, location, dates, job type, pay, qualification, experience, application link), with a confidence score and a row in `extraction_logs`. For every field the evidence is, strongest first:
+
+1. **Published job data** the ad carried (JobPosting block, API fields, import `structured` column).
+2. **Text rules**: the source's own rules from its "Extraction rules" settings, then the built-in label rules (`Closing date:`, `Location:`, `Employer:`, `Job type:`, `Salary:`, `Qualification:`, `Experience:`, `Apply online:`, "apply by 5 December 2026", "3 years experience").
+3. **The title** (split into title and employer only when the source sets a title separator, for example ` at `).
+
+A field with no evidence stays empty. A date without a year ("by 30 November") is not read and no year is assumed. Each value remembers its evidence in `jobs.field_sources`. Ads scoring under 50 are flagged `needs_review`. The raw ad is never changed, an edited ad updates its job instead of adding one, and a job a person marked reviewed stays reviewed. Employer, place, qualification and experience stay as the ad wrote them; standardizing them is the next step. An ad with no title and no text at all is marked failed with the reason.
 
 ## Lost phone
 

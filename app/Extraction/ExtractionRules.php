@@ -14,13 +14,14 @@ class ExtractionRules
     }
 
     /** A reason the pattern is unusable, or null when it is fine. */
-    public static function patternProblem(string $pattern): ?string
+    public static function patternProblem(string $pattern, bool $builtIn = false): ?string
     {
         if (trim($pattern) === '') {
             return 'The pattern is empty.';
         }
 
-        if (strlen($pattern) > self::MAX_PATTERN_LENGTH) {
+        // The length limit is for patterns people type; the built-in rules (DefaultRules) are longer and fixed.
+        if (! $builtIn && strlen($pattern) > self::MAX_PATTERN_LENGTH) {
             return 'The pattern is longer than '.self::MAX_PATTERN_LENGTH.' characters.';
         }
 
