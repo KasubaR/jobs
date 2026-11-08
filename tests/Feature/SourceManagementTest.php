@@ -129,7 +129,7 @@ class SourceManagementTest extends TestCase
     {
         SourceRun::create(['source_id' => $this->jobweb()->id, 'started_at' => now(), 'finished_at' => now(), 'status' => 'failed', 'error_message' => 'Site returned HTTP 503']);
 
-        $this->get('/')->assertOk()->assertSee('Welcome back')->assertSee('Collection activity');
+        $this->get('/')->assertOk()->assertSee('Overview')->assertSee('New ads per day')->assertSee('Sources by access');
         $this->get('/sources')->assertOk()->assertSee('JobWeb Zambia')->assertSee('UN Jobs');
         $this->get('/runs')->assertOk()->assertSee('Site returned HTTP 503');
         $this->get('/runs?status=success')->assertOk()->assertDontSee('Site returned HTTP 503');
