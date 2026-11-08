@@ -3,6 +3,7 @@
 namespace App\Collectors;
 
 use App\Collectors\Html\HtmlConfig;
+use App\Collectors\Html\JobPostingParser;
 use App\Collectors\Html\HtmlPage;
 use App\Models\RawJobPost;
 use App\Models\Source;
@@ -141,25 +142,33 @@ class HtmlListingCollector extends BaseCollector
     /**
      * Replace card text with the ad's own page for ads we do not have yet.
      *
+     * Ads we already have are marked "seen only": the full text was read when they were first found,
+     * and this run only has the shorter listing card, which must not replace it. (An ad whose own page
+     * could not be read at the time is not retried automatically.)
+     *
      * @param  array<string, array{title:string,url:string,external_id:?string,content:string}>  $items
      */
     private function addDetails(Source $source, array $items, array $config, string $host): array
     {
         $known = RawJobPost::where('source_id', $source->id)->whereIn('source_url', array_keys($items))->pluck('source_url')->all();
         $budget = (int) $config['max_detail_requests'];
+        $readStructured = (bool) $config['structured_data'];
 
         foreach ($items as $url => $item) {
-            if ($budget <= 0) {
-                break;
-            }
             if (in_array($url, $known, true)) {
+                $items[$url]['seen_only'] = true;
+
+                continue;
+            }
+            if ($budget <= 0) {
                 continue;
             }
 
             $budget--;
 
             try {
-                $page = new HtmlPage($this->body($this->get($source, $url, 'text/html,application/xhtml+xml')));
+                $html = $this->body($this->get($source, $url, 'text/html,application/xhtml+xml'));
+                $page = new HtmlPage($html);
             } catch (CollectionFailed $e) {
                 $this->problem('ad_page', $url, $e->getMessage());
 
@@ -167,6 +176,14 @@ class HtmlListingCollector extends BaseCollector
             }
 
             $content = $this->readDetail($page, $config);
+
+            // Job data the page publishes about itself (schema.org JobPosting): facts are kept apart from the text.
+            $posting = $readStructured ? app(JobPostingParser::class)->parse($html) : null;
+            if ($posting) {
+                $items[$url]['structured'] = $posting['facts'] ?: null;
+                $content ??= $posting['description']; // no text selector (or no match): use the page's own description
+            }
+
             if ($content !== null) {
                 $items[$url]['content'] = $content;
             }

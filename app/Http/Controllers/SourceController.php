@@ -52,7 +52,7 @@ class SourceController extends Controller
     {
         $tab = in_array($request->query('tab'), ['runs', 'errors', 'access'], true) ? $request->query('tab') : 'overview';
 
-        $data = ['source' => $source, 'tab' => $tab, 'problems' => $manager->activationProblems($source), 'adsCount' => $source->rawPosts()->count(), 'waitingCount' => $source->rawPosts()->pending()->count()];
+        $data = ['source' => $source, 'tab' => $tab, 'problems' => $manager->activationProblems($source), 'adsCount' => $source->rawPosts()->count(), 'waitingCount' => $source->rawPosts()->pending()->count(), 'structuredCount' => $source->rawPosts()->whereNotNull('structured_data')->count()];
 
         if ($tab === 'runs') {
             $data['runs'] = $source->runs()->latest('id')->paginate(15)->withQueryString();

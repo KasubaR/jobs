@@ -18,6 +18,7 @@ class HtmlConfig
         'content' => null,         // CSS selector on the ad's own page; the listing card is used when empty
         'next' => null,            // CSS selector: the "next page" link on a listing page
         'fetch_detail' => false,   // open each NEW ad's own page to read its full text
+        'structured_data' => false, // on each ad page, also read the job data it publishes about itself (schema.org JobPosting)
         'max_pages' => 1,          // listing pages per run
         'max_items' => 50,         // ads per run
         'max_detail_requests' => 20, // ad pages opened per run
@@ -63,6 +64,10 @@ class HtmlConfig
             if (! is_numeric($value) || (int) $value != $value || $value < $min || $value > $max) {
                 $problems[] = "{$key} must be a whole number from {$min} to {$max}.";
             }
+        }
+
+        if ($config['structured_data'] && ! $config['fetch_detail']) {
+            $problems[] = 'Structured data is read from each ad\'s own page, so "Open each new ad\'s own page" must be on.';
         }
 
         if ($config['max_pages'] > 1 && blank($config['next'])) {

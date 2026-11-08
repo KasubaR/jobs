@@ -258,7 +258,10 @@ abstract class BaseCollector implements Collector
     /**
      * Store ads through the one shared path: email removal, retain_raw, hashing, versioning.
      *
-     * @param  list<array{title:string,url:string,external_id:?string,content:string}>  $items
+     * Optional keys per item: `structured` (facts published by the page itself, no ad text) and
+     * `seen_only` (already stored in full; only note that it is still listed).
+     *
+     * @param  list<array{title:string,url:string,external_id:?string,content:string,structured?:?array,seen_only?:bool}>  $items
      * @return array{new:int,updated:int,unchanged:int,failed:int}
      */
     protected function ingest(Source $source, SourceRun $run, array $items): array
@@ -281,8 +284,25 @@ abstract class BaseCollector implements Collector
     /** @return 'new'|'updated'|'unchanged' */
     private function store(Source $source, SourceRun $run, array $item): string
     {
+        // "Seen again" only: the ad is already stored in full (for example its own page was read earlier)
+        // and this run has only the short listing text. Touch it, but never replace the full text
+        // with the shorter one or store a new version.
+        if (! empty($item['seen_only'])) {
+            $latest = RawJobPost::where('source_id', $source->id)->where('source_url', $item['url'])->latest('id')->first();
+
+            if ($latest) {
+                $latest->update(['last_seen_at' => now(), 'is_removed' => false]);
+
+                return 'unchanged';
+            }
+        }
+
         $content = $this->stripEmails($item['content']);
-        $hash = hash('sha256', $item['title']."\n".trim(preg_replace('/\s+/', ' ', $content)));
+        $structured = $this->cleanStructured($item['structured'] ?? null);
+
+        // Structured data joins the fingerprint only when present, so ads stored before it existed keep their hash.
+        $hash = hash('sha256', $item['title']."\n".trim(preg_replace('/\s+/', ' ', $content))
+            .($structured ? "\n".json_encode($structured, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : ''));
 
         $same = RawJobPost::where('source_id', $source->id)
             ->where('source_url', $item['url'])
@@ -307,6 +327,7 @@ abstract class BaseCollector implements Collector
             'external_id' => $item['external_id'],
             'raw_title' => $item['title'],
             'raw_content' => ($source->retain_raw ?? true) ? $content : null,
+            'structured_data' => $structured, // facts only (no ad text), kept after the raw text is cleared
             'raw_purged_at' => ($source->retain_raw ?? true) ? null : now(),
             'content_hash' => $hash,
             'http_status' => 200,
@@ -319,6 +340,22 @@ abstract class BaseCollector implements Collector
         RawJobPostStored::dispatch($post->id, $hadEarlierVersion ? 'updated' : 'new');
 
         return $hadEarlierVersion ? 'updated' : 'new';
+    }
+
+    /** Emails removed from every text value, so structured data never carries personal contact details. */
+    private function cleanStructured(?array $data): ?array
+    {
+        if (! $data) {
+            return null;
+        }
+
+        array_walk_recursive($data, function (&$value) {
+            if (is_string($value)) {
+                $value = $this->stripEmails($value);
+            }
+        });
+
+        return $data;
     }
 
     private function stripEmails(string $text): string

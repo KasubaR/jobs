@@ -55,7 +55,7 @@
       <dt>Frequency</dt><dd>{{ Source::FREQUENCIES[$source->collection_frequency] ?? $source->collection_frequency }}, at least {{ $source->min_interval_seconds }}s between requests</dd>
       <dt>Last collected</dt><dd>{{ $source->last_collection_at?->format('j M Y H:i') ?? 'never' }}</dd>
       <dt>Next due</dt><dd>{{ $manual ? 'Manual: ads are pasted in' : ($source->is_active ? ($source->next_collection_at?->format('j M Y H:i') ?? 'at the next check') : 'switched off') }}</dd>
-      <dt>Stored ads</dt><dd>{{ number_format($adsCount) }}@if ($adsCount) <span class="mut">({{ number_format($waitingCount) }} waiting to be processed)</span>@endif</dd>
+      <dt>Stored ads</dt><dd>{{ number_format($adsCount) }}@if ($adsCount) <span class="mut">({{ number_format($waitingCount) }} waiting to be processed@if ($structuredCount), {{ number_format($structuredCount) }} with structured job data@endif)</span>@endif</dd>
       <dt>Raw ad text</dt><dd>{{ $source->retain_raw ? 'Kept for 90 days' : 'Not kept' }}</dd>
       <dt>Access decided</dt><dd>{{ $source->access_decided_at?->format('j M Y H:i') ?? 'not yet' }}@if ($source->access_decision_note) <div class="mut">{{ $source->access_decision_note }}</div>@endif</dd>
       <dt>Notes</dt><dd>{{ $source->notes ?: 'none' }}</dd>

@@ -42,6 +42,7 @@ class SourceFormData
         }
 
         $out['fetch_detail'] = filter_var($html['fetch_detail'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $out['structured_data'] = filter_var($html['structured_data'] ?? false, FILTER_VALIDATE_BOOLEAN);
         foreach (['max_pages', 'max_items', 'max_detail_requests'] as $key) {
             if (isset($html[$key]) && $html[$key] !== '') {
                 $out[$key] = is_numeric($html[$key]) ? (int) $html[$key] : $html[$key];

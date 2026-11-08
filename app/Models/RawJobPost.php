@@ -29,6 +29,7 @@ class RawJobPost extends Model
             'last_seen_at' => 'datetime',
             'raw_purged_at' => 'datetime',
             'processed_at' => 'datetime',
+            'structured_data' => 'array',
         ];
     }
 
