@@ -212,7 +212,7 @@ abstract class BaseCollector implements Collector
      * disallows, and waits so we never exceed the source's minimum interval
      * (or the host's Crawl-delay, if larger).
      */
-    protected function get(Source $source, string $url, string $accept = '*/*'): \Illuminate\Http\Client\Response
+    protected function get(Source $source, string $url, string $accept = '*/*', array $headers = []): \Illuminate\Http\Client\Response
     {
         $robots = app(RobotsGuard::class);
 
@@ -222,7 +222,7 @@ abstract class BaseCollector implements Collector
 
         $this->throttle($url, max((float) $source->min_interval_seconds, (float) ($robots->crawlDelay($url) ?? 0)));
 
-        return $this->http()->accept($accept)->get($url);
+        return $this->http()->withHeaders($headers)->accept($accept)->get($url);
     }
 
     private function throttle(string $url, float $minSeconds): void

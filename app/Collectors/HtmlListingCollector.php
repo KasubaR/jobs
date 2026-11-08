@@ -46,6 +46,11 @@ class HtmlListingCollector extends BaseCollector
     protected function fetch(Source $source): array
     {
         $config = HtmlConfig::resolve($source->collector_config);
+
+        if (filled($config['sitemap'])) {
+            return $this->fetchFromSitemap($source, $config);
+        }
+
         $host = strtolower((string) parse_url($source->job_listing_url, PHP_URL_HOST));
         $maxPages = $this->probing ? 1 : (int) $config['max_pages'];
 
@@ -94,6 +99,189 @@ class HtmlListingCollector extends BaseCollector
         }
 
         return array_values($items);
+    }
+
+    /**
+     * Sitemap mode: the site's own sitemap lists the ads' addresses, newest first. Only new ads' pages are opened
+     * (one request each, up to max_detail_requests per run); ads already stored are just marked "seen again".
+     * Addresses left over when the budget runs out are picked up by the next runs.
+     */
+    private function fetchFromSitemap(Source $source, array $config): array
+    {
+        $hosts = array_values(array_filter(array_unique([
+            strtolower((string) parse_url($source->job_listing_url, PHP_URL_HOST)),
+            strtolower((string) parse_url($source->website_url, PHP_URL_HOST)),
+        ])));
+
+        if (! in_array(strtolower((string) parse_url((string) $config['sitemap'], PHP_URL_HOST)), $hosts, true)) {
+            throw new CollectionFailed('The sitemap must be on the source\'s own site ('.implode(' or ', $hosts).').');
+        }
+
+        $entries = $this->sitemapEntries($source, $config, (string) $config['sitemap'], $hosts);
+
+        $wanted = [];
+        foreach ($entries as $entry) {
+            $url = preg_replace('~#.*$~', '', $entry['url']);
+
+            if (! preg_match('~^https?://~i', $url) || strlen($url) > 500
+                || ! in_array(strtolower((string) parse_url($url, PHP_URL_HOST)), $hosts, true)
+                || ! $this->pathMatches((string) parse_url($url, PHP_URL_PATH), $config['sitemap_match'])) {
+                continue;
+            }
+
+            $wanted[$url] ??= ['url' => $url, 'lastmod' => $entry['lastmod']];
+        }
+
+        if ($wanted === []) {
+            throw new CollectionFailed('No addresses in the sitemap matched'.(filled($config['sitemap_match']) ? " the ad address pattern ({$config['sitemap_match']})" : '').'. The site\'s sitemap may have changed, so these settings need updating.');
+        }
+
+        $items = [];
+        foreach (array_slice($this->newestFirst(array_values($wanted)), 0, (int) $config['max_items']) as $entry) {
+            // The title and text come from the ad's own page; until then this is only a placeholder.
+            $items[$entry['url']] = ['title' => $this->placeholderTitle($entry['url']), 'url' => $entry['url'], 'external_id' => null, 'content' => '', 'needs_title' => true];
+        }
+
+        return array_values($this->probing ? $items : $this->addDetails($source, $items, $config, ''));
+    }
+
+    /**
+     * Ad addresses listed by the sitemap. A sitemap that is an index of other sitemaps is followed one level,
+     * newest first, for at most max_pages files (one when only testing access).
+     *
+     * @return list<array{url:string,lastmod:?int}>
+     */
+    private function sitemapEntries(Source $source, array $config, string $url, array $hosts): array
+    {
+        $root = $this->readSitemap($this->body($this->get($source, $url, 'application/xml, text/xml;q=0.9')));
+
+        if ($root['type'] === 'urlset') {
+            return $root['entries'];
+        }
+
+        $children = array_filter($root['entries'], fn ($e) => in_array(strtolower((string) parse_url($e['url'], PHP_URL_HOST)), $hosts, true)
+            && ! str_ends_with(strtolower((string) parse_url($e['url'], PHP_URL_PATH)), '.gz')); // compressed sitemaps are not read
+        $children = array_slice($this->newestFirst(array_values($children)), 0, $this->probing ? 1 : (int) $config['max_pages']);
+
+        $entries = [];
+        $last = null;
+
+        foreach ($children as $child) {
+            try {
+                $sub = $this->readSitemap($this->body($this->get($source, $child['url'], 'application/xml, text/xml;q=0.9')));
+            } catch (CollectionFailed $e) {
+                $last = $e;
+                $this->problem('listing', $child['url'], $e->getMessage());
+
+                continue;
+            }
+
+            if ($sub['type'] === 'urlset') {
+                array_push($entries, ...$sub['entries']);
+            }
+        }
+
+        if ($entries === [] && $last) {
+            throw $last; // every sitemap file failed
+        }
+
+        return $entries;
+    }
+
+    /** @return array{type:'urlset'|'index',entries:list<array{url:string,lastmod:?int}>} */
+    private function readSitemap(string $xml): array
+    {
+        $previous = libxml_use_internal_errors(true);
+        $doc = simplexml_load_string($xml, options: LIBXML_NONET | LIBXML_NOCDATA);
+        libxml_use_internal_errors($previous);
+
+        if ($doc === false || ! in_array($doc->getName(), ['urlset', 'sitemapindex'], true)) {
+            throw new CollectionFailed('The sitemap was not readable.');
+        }
+
+        $index = $doc->getName() === 'sitemapindex';
+        $entries = [];
+
+        foreach ($index ? $doc->sitemap : $doc->url as $node) {
+            $loc = trim((string) $node->loc);
+            $time = trim((string) $node->lastmod) !== '' ? strtotime((string) $node->lastmod) : false;
+
+            if ($loc !== '') {
+                $entries[] = ['url' => $loc, 'lastmod' => $time === false ? null : $time];
+            }
+        }
+
+        return ['type' => $index ? 'index' : 'urlset', 'entries' => $entries];
+    }
+
+    /**
+     * Dated entries first, newest to oldest; undated ones after them in the order given.
+     *
+     * @param  list<array{url:string,lastmod:?int}>  $entries
+     * @return list<array{url:string,lastmod:?int}>
+     */
+    private function newestFirst(array $entries): array
+    {
+        usort($entries, fn ($a, $b) => match (true) {
+            $a['lastmod'] !== null && $b['lastmod'] !== null => $b['lastmod'] <=> $a['lastmod'],
+            $a['lastmod'] !== null => -1,
+            $b['lastmod'] !== null => 1,
+            default => 0,
+        });
+
+        return $entries;
+    }
+
+    /** Pattern from the settings: matches from the start of the path; * is any characters, # is one digit. No regular expressions. */
+    private function pathMatches(string $path, ?string $pattern): bool
+    {
+        if (blank($pattern)) {
+            return true;
+        }
+
+        $regex = '';
+        foreach (str_split((string) $pattern) as $char) {
+            $regex .= match ($char) {
+                '*' => '.*',
+                '#' => '[0-9]',
+                default => preg_quote($char, '~'),
+            };
+        }
+
+        return (bool) preg_match('~^'.$regex.'~', $path);
+    }
+
+    private function placeholderTitle(string $url): string
+    {
+        $slug = basename((string) parse_url($url, PHP_URL_PATH));
+        $slug = trim(preg_replace('/^\d+-?/', '', str_replace(['-', '_'], ' ', $slug)));
+
+        return mb_substr($slug !== '' ? ucfirst($slug) : $url, 0, 500);
+    }
+
+    /** The ad's title from its own page: the "title" selector if set, else its job data, else the first heading, else the page title. */
+    private function readTitle(HtmlPage $page, array $config, ?string $structuredTitle): ?string
+    {
+        $candidates = [];
+
+        if (filled($config['title']) && ($node = $page->first($config['title']))) {
+            $candidates[] = $page->text($node);
+        }
+        $candidates[] = $structuredTitle;
+        foreach (['h1', 'title'] as $selector) {
+            if ($node = $page->first($selector)) {
+                $candidates[] = $page->text($node);
+            }
+        }
+
+        foreach ($candidates as $title) {
+            $title = trim((string) $title);
+            if ($title !== '') {
+                return mb_substr($title, 0, 500);
+            }
+        }
+
+        return null;
     }
 
     /** @return list<DOMNode> one node per ad on a listing page */
@@ -150,13 +338,18 @@ class HtmlListingCollector extends BaseCollector
      */
     private function addDetails(Source $source, array $items, array $config, string $host): array
     {
-        $known = RawJobPost::where('source_id', $source->id)->whereIn('source_url', array_keys($items))->pluck('source_url')->all();
+        $known = RawJobPost::where('source_id', $source->id)->whereIn('source_url', array_keys($items))->pluck('raw_title', 'source_url')->all();
         $budget = (int) $config['max_detail_requests'];
         $readStructured = (bool) $config['structured_data'];
 
         foreach ($items as $url => $item) {
-            if (in_array($url, $known, true)) {
+            if (array_key_exists($url, $known)) {
                 $items[$url]['seen_only'] = true;
+
+                if (! empty($item['needs_title'])) {
+                    $items[$url]['title'] = $known[$url] ?: $item['title']; // sitemap mode: the title was read when the ad was first stored
+                    unset($items[$url]['needs_title']);
+                }
 
                 continue;
             }
@@ -187,9 +380,26 @@ class HtmlListingCollector extends BaseCollector
             if ($content !== null) {
                 $items[$url]['content'] = $content;
             }
+
+            if (! empty($item['needs_title'])) {
+                $title = $this->readTitle($page, $config, $posting['facts']['title'] ?? null);
+
+                if ($title === null) {
+                    $this->problem('ad_page', $url, 'No title could be read from this page, so it was not stored.');
+                    unset($items[$url]);
+
+                    continue;
+                }
+
+                $items[$url]['title'] = $title;
+                $items[$url]['content'] = $items[$url]['content'] !== '' ? $items[$url]['content'] : $title;
+                unset($items[$url]['needs_title']);
+            }
         }
 
-        return $items;
+        // Sitemap mode: an ad whose own page was not read (budget used up, or the page failed) is not stored yet;
+        // a later run picks it up. Nothing is ever stored under a placeholder title.
+        return array_filter($items, fn ($item) => empty($item['needs_title']));
     }
 
     /** The ad's full text from its own page, or null to keep the listing card. */

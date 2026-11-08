@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Collectors\Api\ApiConfig;
 use App\Collectors\CollectorRegistry;
 use App\Collectors\Html\HtmlConfig;
 use App\Extraction\ExtractionRules;
@@ -46,6 +47,22 @@ class SourceRequest extends FormRequest
             if ($this->input('collector') === 'html_listing') {
                 foreach (HtmlConfig::validate(SourceFormData::html($this->all())) as $problem) {
                     $validator->errors()->add('html', $problem);
+                }
+            }
+
+            if ($this->input('collector') === 'api_json') {
+                $api = SourceFormData::api($this->all());
+
+                foreach (ApiConfig::validate($api) as $problem) {
+                    $validator->errors()->add('api', $problem);
+                }
+                if ($this->input('collection_method') !== 'api') {
+                    $validator->errors()->add('collection_method', 'The API collector needs the collection method "Public API".');
+                }
+                if (blank($this->input('job_listing_url'))) {
+                    $validator->errors()->add('job_listing_url', 'Enter the API address (the endpoint that lists the ads).');
+                } elseif (isset($api['key_name']) && ! str_starts_with(strtolower((string) $this->input('job_listing_url')), 'https://')) {
+                    $validator->errors()->add('job_listing_url', 'A source that uses an API key must use an https:// address, so the key is never sent unprotected.');
                 }
             }
 

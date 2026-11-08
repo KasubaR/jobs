@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Collectors\AccessCheck;
+use App\Collectors\Api\ApiConfig;
 use App\Collectors\CollectorRegistry;
 use App\Collectors\ManualSubmissionCollector;
 use App\Jobs\CollectSource;
@@ -66,6 +67,19 @@ class SourceManager
             $problems[] = 'No collector is assigned to this source, so nothing can collect from it yet.';
         } elseif ($this->registry->for($source)->method() !== $source->collection_method) {
             $problems[] = "Its collector works by '{$this->registry->for($source)->method()}', but the source's collection method is '{$source->collection_method}'.";
+        }
+
+        if ($source->collector === 'api_json') {
+            $api = $source->collector_config['api'] ?? [];
+
+            foreach (ApiConfig::validate($api) as $problem) {
+                $problems[] = "API settings: {$problem}";
+            }
+
+            $keyName = $api['key_name'] ?? null;
+            if (filled($keyName) && blank(config('job_intel.api_keys')[$keyName] ?? null)) {
+                $problems[] = "The API key is not set on the server: add {$keyName}=... to the .env file.";
+            }
         }
 
         // Manual sources have nothing to fetch, so they need no listing URL.

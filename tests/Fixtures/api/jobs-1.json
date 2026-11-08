@@ -1,0 +1,41 @@
+{
+  "status": "ok",
+  "data": {
+    "jobs": [
+      {
+        "id": 101,
+        "title": "Budget Analyst",
+        "link": "https://board.test/jobs/101-budget-analyst",
+        "description": "<p>Prepare budgets. Send applications to hr@example.org by 30 November.</p>",
+        "company": "Example Charity",
+        "place": "Lusaka",
+        "posted": "2026-11-02T08:00:00Z",
+        "closes": "2026-11-30",
+        "type": "FULL_TIME"
+      },
+      {
+        "id": 102,
+        "title": "Driver",
+        "link": "/jobs/102-driver",
+        "description": ["Drive haul trucks.", "Valid licence required."],
+        "company": "Sample Mining",
+        "place": "Solwezi",
+        "posted": "2026-11-03",
+        "closes": "2026-12-05",
+        "type": "CONTRACTOR"
+      },
+      {
+        "id": 103,
+        "title": "Off-site ad",
+        "link": "https://elsewhere.test/jobs/103",
+        "description": "Should be skipped: it points to another site."
+      },
+      {
+        "id": 104,
+        "title": "",
+        "link": "/jobs/104-no-title",
+        "description": "Should be skipped: no title."
+      }
+    ]
+  }
+}

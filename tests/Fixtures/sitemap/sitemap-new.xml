@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://board.test/jobs/300-middle-ad</loc><lastmod>2026-11-03T10:00:00+00:00</lastmod></url>
+  <url><loc>https://board.test/jobs/full-time</loc><lastmod>2026-11-06</lastmod></url>
+  <url><loc>https://board.test/jobs/302-undated-ad</loc></url>
+  <url><loc>https://board.test/companies/acme-1</loc><lastmod>2026-11-06</lastmod></url>
+  <url><loc>https://elsewhere.test/jobs/999-offsite</loc><lastmod>2026-11-06</lastmod></url>
+  <url><loc>https://board.test/jobs/301-newest-ad</loc><lastmod>2026-11-05</lastmod></url>
+  <url><loc>https://board.test/jobs/301-newest-ad#apply</loc><lastmod>2026-11-05</lastmod></url>
+</urlset>

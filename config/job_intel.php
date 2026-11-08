@@ -42,6 +42,13 @@ return [
     // Seconds to wait for a source before giving up.
     'http_timeout' => 20,
 
+    // API keys for sources collected through an official API. A key lives ONLY here, in the server's .env, as a
+    // setting named COLLECTOR_KEY_<SOMETHING>; a source stores just that name, never the key. Nothing else from
+    // the environment can be picked up this way.
+    'api_keys' => collect([...$_SERVER, ...$_ENV])
+        ->filter(fn ($value, $name) => is_string($name) && str_starts_with($name, 'COLLECTOR_KEY_') && is_string($value) && $value !== '')
+        ->all(),
+
     // Refuse feeds bigger than this many bytes.
     'max_response_bytes' => 5 * 1024 * 1024,
 ];

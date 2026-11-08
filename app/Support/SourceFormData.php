@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Collectors\Api\ApiConfig;
+
 /** Turns the flat fields of the source form into the nested settings stored on the source. */
 class SourceFormData
 {
@@ -34,7 +36,7 @@ class SourceFormData
         $html = (array) ($input['html'] ?? []);
 
         $out = [];
-        foreach (['item', 'link', 'title', 'content', 'next'] as $key) {
+        foreach (['item', 'link', 'title', 'content', 'next', 'sitemap', 'sitemap_match'] as $key) {
             $value = trim((string) ($html[$key] ?? ''));
             if ($value !== '') {
                 $out[$key] = $value;
@@ -46,6 +48,28 @@ class SourceFormData
         foreach (['max_pages', 'max_items', 'max_detail_requests'] as $key) {
             if (isset($html[$key]) && $html[$key] !== '') {
                 $out[$key] = is_numeric($html[$key]) ? (int) $html[$key] : $html[$key];
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return array<string, mixed> */
+    public static function api(array $input): array
+    {
+        $api = (array) ($input['api'] ?? []);
+
+        $out = [];
+        foreach ([...ApiConfig::PATH_KEYS, 'url_template', 'page_param', 'key_name', 'key_header'] as $key) {
+            $value = trim((string) ($api[$key] ?? ''));
+            if ($value !== '') {
+                $out[$key] = $value;
+            }
+        }
+
+        foreach (['max_pages', 'max_items'] as $key) {
+            if (isset($api[$key]) && $api[$key] !== '') {
+                $out[$key] = is_numeric($api[$key]) ? (int) $api[$key] : $api[$key];
             }
         }
 
@@ -81,6 +105,10 @@ class SourceFormData
 
         if ($collector === 'html_listing') {
             $config['html'] = self::html($input);
+        }
+
+        if ($collector === 'api_json') {
+            $config['api'] = self::api($input);
         }
 
         if ($collector === 'python_worker') {

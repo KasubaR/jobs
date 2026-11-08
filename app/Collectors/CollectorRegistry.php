@@ -18,6 +18,7 @@ class CollectorRegistry
         'manual_submission' => ManualSubmissionCollector::class,
         'html_listing' => HtmlListingCollector::class,
         'python_worker' => PythonWorkerCollector::class,
+        'api_json' => ApiJsonCollector::class,
     ];
 
     /** @return array<string, class-string<Collector>> */

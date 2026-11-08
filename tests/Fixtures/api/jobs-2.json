@@ -1,0 +1,18 @@
+{
+  "status": "ok",
+  "data": {
+    "jobs": [
+      {
+        "id": 201,
+        "title": "Nurse",
+        "link": "/jobs/201-nurse",
+        "description": "Care for patients.",
+        "company": "Sample Clinic",
+        "place": "Kitwe",
+        "posted": "2026-11-04",
+        "closes": "2026-12-01",
+        "type": "FULL_TIME"
+      }
+    ]
+  }
+}

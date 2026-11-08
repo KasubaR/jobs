@@ -49,8 +49,8 @@
   <fieldset class="fs" data-for-collector="html_listing" @if (old('collector', $source->collector) !== 'html_listing') hidden @endif><legend>Public HTML pages</legend>
     <p class="sub" style="margin-bottom:12px">How to find the ads on this website. CSS selectors only, no code. Nothing is collected until the source is approved and active.</p>
     <div class="fgrid">
-      @foreach ([['item', 'Ad on the listing page (selector)', 'e.g. li.job-card'], ['link', 'Link inside the ad (selector)', 'default: a'], ['title', 'Title inside the ad (selector)', 'empty = use the link text'], ['next', '"Next page" link (selector)', 'needed for more than one page'], ['content', 'Full ad text on the ad page (selector)', 'used when opening ad pages']] as [$key, $label, $help])
-        <div class="field"><label for="html_{{ $key }}">{{ $label }}</label><input id="html_{{ $key }}" name="html[{{ $key }}]" type="text" maxlength="200" value="{{ old('html.'.$key, $html[$key] ?? '') }}"><span class="help">{{ $help }}</span></div>
+      @foreach ([['item', 'Ad on the listing page (selector)', 'e.g. li.job-card'], ['link', 'Link inside the ad (selector)', 'default: a'], ['title', 'Title inside the ad (selector)', 'empty = use the link text'], ['next', '"Next page" link (selector)', 'needed for more than one page'], ['content', 'Full ad text on the ad page (selector)', 'used when opening ad pages'], ['sitemap', 'Sitemap address (optional)', 'e.g. https://example.com/sitemap.xml. Finds ads there, newest first, instead of on listing pages. Then the ad selector, link and next-page settings are not used, and "Open each new ad\'s own page" must be on.'], ['sitemap_match', 'Ad address pattern (with a sitemap)', 'e.g. /jobs/#* where * is anything and # is one digit. Keeps only ad pages and skips category and company pages.']] as [$key, $label, $help])
+        <div class="field"><label for="html_{{ $key }}">{{ $label }}</label><input id="html_{{ $key }}" name="html[{{ $key }}]" type="text" maxlength="300" value="{{ old('html.'.$key, $html[$key] ?? '') }}"><span class="help">{{ $help }}</span></div>
       @endforeach
       <div class="field"><label class="check"><input type="hidden" name="html[fetch_detail]" value="0"><input type="checkbox" name="html[fetch_detail]" value="1" @checked(old('html.fetch_detail', $html['fetch_detail'] ?? false))> Open each new ad's own page</label><span class="help">One extra request per new ad, up to the limit below.</span></div>
       <div class="field"><label class="check"><input type="hidden" name="html[structured_data]" value="0"><input type="checkbox" name="html[structured_data]" value="1" @checked(old('html.structured_data', $html['structured_data'] ?? false))> Also read the job data the ad page publishes</label><span class="help">Many sites include machine-readable job data (title, employer, place, dates, pay) for search engines. Facts only, no contact details. Needs "Open each new ad's own page".</span></div>
@@ -60,7 +60,35 @@
     </div>
   </fieldset>
 
-  <fieldset class="fs" data-for-collector="python_worker" @if (old('collector', $source->collector) !== 'python_worker') hidden @endif><legend>Python worker</legend>
+  <fieldset class="fs" data-for-collector="api_json" @if (old('collector', $source->collector) !== 'api_json') hidden @endif><legend>Public API</legend>
+    <p class="sub" style="margin-bottom:12px">For a site that offers an official JSON API. Put the API address in "Job listing URL" above, then say which fields hold each ad's title and link. Field names are paths into the JSON, joined by dots (for example <code>data.title</code>). Nothing is collected until the source is approved and active.</p>
+    @php $api = array_merge(\App\Collectors\Api\ApiConfig::DEFAULTS, $cfg['api'] ?? []); @endphp
+    <div class="fgrid">
+      @foreach ([
+        ['items_path', 'Where the list of ads is', 'e.g. data.jobs. Empty = the response is the list itself.'],
+        ['title', 'Title field', 'e.g. title (required)'],
+        ['url', 'Link field', 'e.g. url. Or use a link template below.'],
+        ['url_template', 'Link template', 'e.g. https://example.com/jobs/{id}. Needs the ID field.'],
+        ['id', 'ID field', 'e.g. id (optional)'],
+        ['content', 'Ad text field', 'e.g. description. Empty = the title is stored.'],
+        ['employer', 'Employer field', 'optional fact'],
+        ['location', 'Location field', 'optional fact'],
+        ['date_posted', 'Date posted field', 'optional fact'],
+        ['valid_through', 'Closing date field', 'optional fact'],
+        ['employment_type', 'Job type field', 'optional fact'],
+        ['page_param', 'Page parameter', 'e.g. page. Needed for more than one page.'],
+      ] as [$key, $label, $help])
+        <div class="field"><label for="api_{{ $key }}">{{ $label }}</label><input id="api_{{ $key }}" name="api[{{ $key }}]" type="text" maxlength="300" value="{{ old('api.'.$key, $api[$key] ?? '') }}"><span class="help">{{ $help }}</span></div>
+      @endforeach
+      <div class="field"><label for="api_max_pages">Pages per run</label><input id="api_max_pages" name="api[max_pages]" type="number" min="1" max="{{ \App\Collectors\Api\ApiConfig::MAX_PAGES }}" value="{{ old('api.max_pages', $api['max_pages']) }}"></div>
+      <div class="field"><label for="api_max_items">Ads per run</label><input id="api_max_items" name="api[max_items]" type="number" min="1" max="{{ \App\Collectors\Api\ApiConfig::MAX_ITEMS }}" value="{{ old('api.max_items', $api['max_items']) }}"></div>
+      <div class="field"><label for="api_key_name">API key name</label><input id="api_key_name" name="api[key_name]" type="text" maxlength="60" placeholder="COLLECTOR_KEY_EXAMPLE" value="{{ old('api.key_name', $api['key_name'] ?? '') }}"><span class="help">Only the NAME of the setting. Put the key itself in the server's .env file as <code>COLLECTOR_KEY_...=the-key</code>. Never type the key here. Needs an https:// address.</span></div>
+      <div class="field"><label for="api_key_header">Key header</label><input id="api_key_header" name="api[key_header]" type="text" maxlength="40" value="{{ old('api.key_header', $api['key_header']) }}"><span class="help">Authorization sends "Bearer &lt;key&gt;". Another name, such as X-API-Key, sends the key as is.</span></div>
+    </div>
+    @error('api')<span class="err">{{ $message }}</span>@enderror
+  </fieldset>
+
+  <fieldset class="fs" data-for-collector="python_worker"@if (old('collector', $source->collector) !== 'python_worker') hidden @endif><legend>Python worker</legend>
     <p class="sub" style="margin-bottom:12px">For pages that need real parsing or a real browser. The app does not fetch this source. A Python program on your own computer (<code>collectors_py/run_due.py</code>) collects it and hands the ads over; the app then schedules, logs and backs off as for any source. Set the collection method to "Python worker".</p>
     @php $py = $cfg['python'] ?? []; @endphp
     <div class="fgrid">
