@@ -74,6 +74,4 @@ An empty list is reported as a possible layout change (the app logs a failed run
 .venv\Scripts\python.exe -m pytest -m "not playwright and not e2e"
 ```
 
-Status when this was written: the BeautifulSoup path, the runner, the robots and block rules and the end-to-end tests with the real app all pass. The 9 browser tests are **skipped until Playwright and Chromium are installed** (the downloads could not complete on the connection available at the time), so the Playwright path has been written but not yet run. After installing, run `.venv\Scripts\python.exe -m pytest -m playwright`.
-
 They run against a small local website (`tests/site`, served on 127.0.0.1) and never contact a real site. `-m playwright` needs Chromium installed; `-m e2e` runs the real PHP app against a throwaway SQLite database.
