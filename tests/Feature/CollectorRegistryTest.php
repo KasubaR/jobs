@@ -46,7 +46,7 @@ class CollectorRegistryTest extends TestCase
     public function test_source_without_a_collector_is_refused(): void
     {
         $this->seed(SourceSeeder::class);
-        $source = Source::where('name', 'Job Search Zambia')->first();
+        $source = Source::where('name', 'Great Zambia Jobs')->first();
 
         $this->expectException(RuntimeException::class);
         app(CollectorRegistry::class)->for($source);
@@ -97,7 +97,7 @@ class CollectorRegistryTest extends TestCase
         Http::fake(['*' => Http::response(file_get_contents(base_path('tests/Fixtures/jobweb-feed.xml')), 200)]);
         $this->seed(SourceSeeder::class);
         Source::where('name', 'JobWeb Zambia')->first()->update(['access_status' => 'approved', 'is_active' => true]);
-        Source::where('name', 'Job Search Zambia')->first()->update(['access_status' => 'approved', 'is_active' => true]);
+        Source::where('name', 'Great Zambia Jobs')->first()->update(['access_status' => 'approved', 'is_active' => true, 'collection_method' => 'html']);
 
         $this->artisan('collect:run')
             ->expectsOutputToContain('JobWeb Zambia: success')

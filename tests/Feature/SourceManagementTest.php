@@ -63,7 +63,7 @@ class SourceManagementTest extends TestCase
 
     public function test_cannot_activate_an_approved_source_without_a_collector(): void
     {
-        $source = Source::where('name', 'Job Search Zambia')->first();
+        $source = Source::where('name', 'Great Zambia Jobs')->first();
         app(SourceManager::class)->decideAccess($source, 'approved', 'Owner checked the terms.');
 
         $this->assertStringContainsString('No collector is assigned', implode(' ', app(SourceManager::class)->activationProblems($source->fresh())));

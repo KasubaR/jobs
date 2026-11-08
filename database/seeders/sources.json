@@ -57,13 +57,27 @@
     "website_url": "https://jobsearchzm.com/",
     "job_listing_url": "https://jobsearchzm.com/job_listing-sitemap.xml",
     "source_type": "job_board",
-    "collection_method": "pending_review",
-    "collection_frequency": "weekly",
+    "collection_method": "html",
+    "collection_frequency": "every_6_hours",
     "access_status": "pending",
     "last_collection": null,
     "active": false,
-    "notes": "robots.txt allows all. Terms forbid republishing, reproducing, copying or redistributing site material; bots not mentioned. /feed/ looks stale (last build 3 Jun 2025). Sitemap lists about 153 job listings. Needs written permission before use. The listing URL above is the sitemap.",
-    "collector": null
+    "notes": "robots.txt allows all. Terms forbid republishing, reproducing, copying or redistributing site material; bots not mentioned. /feed/ looks stale (last build 3 Jun 2025). Sitemap lists about 153 job listings; each ad page carries a schema.org JobPosting block. Collector reads the sitemap (newest first) and the ad pages only. Needs written permission before use. The listing URL above is the sitemap.",
+    "collector": "html_listing",
+    "min_interval_seconds": 2,
+    "collector_config": {
+      "html": {
+        "sitemap": "https://jobsearchzm.com/job_listing-sitemap.xml",
+        "sitemap_match": "/job/*",
+        "title": "h1.entry-title",
+        "content": ".entry-content",
+        "fetch_detail": true,
+        "structured_data": true,
+        "max_pages": 1,
+        "max_items": 60,
+        "max_detail_requests": 20
+      }
+    }
   },
   {
     "source_name": "Teaching Service Commission",
