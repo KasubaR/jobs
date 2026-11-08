@@ -28,3 +28,8 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Python worker
+collectors_py/.venv/
+collectors_py/**/__pycache__/
+collectors_py/.pytest_cache/

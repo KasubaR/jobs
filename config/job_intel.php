@@ -15,6 +15,10 @@ return [
     // the last value is reused for later failures).
     'retry_backoff_minutes' => [60, 360, 1440],
 
+    // Files of ads (Import file button, collect:import): most bytes and most ads in one file.
+    'import_max_bytes' => 5 * 1024 * 1024,
+    'import_max_rows' => 500,
+
     // Hand each stored or changed ad to the processing stage as a background job. Leave off until that
     // stage exists: ads then wait as "pending" without queueing a job per ad (processing:dispatch can queue them later).
     'processing_enabled' => (bool) env('PROCESSING_ENABLED', false),

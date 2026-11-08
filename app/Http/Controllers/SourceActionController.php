@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Extraction\ExtractionPreview;
+use App\Import\AdFileParser;
+use App\Import\AdImporter;
+use App\Import\ImportFileException;
+use Illuminate\Http\Response;
 use App\Models\Source;
 use App\Services\SourceManager;
 use App\Support\SourceFormData;
@@ -100,6 +104,48 @@ class SourceActionController extends Controller
         }
 
         return back()->with('status', $run->items_new + $run->items_updated > 0 ? 'Ad added.' : 'That ad is already stored, so nothing new was added.');
+    }
+
+    /** A file of ads (CSV or JSON), stored as one run. */
+    public function importFile(Request $request, Source $source, AdImporter $importer): RedirectResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'max:'.(int) (config('job_intel.import_max_bytes') / 1024)],
+        ]);
+
+        $file = $request->file('file');
+        $format = AdFileParser::formatFor($file->getClientOriginalName());
+
+        if (! $format) {
+            return back()->with('error', 'Only .csv and .json files can be imported.');
+        }
+
+        try {
+            $run = $importer->import($source, (string) file_get_contents($file->getRealPath()), $format);
+        } catch (ImportFileException|RuntimeException $e) {
+            return back()->with('error', 'Import failed. '.$e->getMessage());
+        }
+
+        $summary = "{$run->status}: discovered {$run->items_found}, new {$run->items_new}, changed {$run->items_updated}, unchanged {$run->items_unchanged}, failed {$run->items_failed}.";
+
+        return back()
+            ->with($run->status === 'failed' ? 'error' : 'status', ($run->status === 'failed' ? 'Nothing was imported. ' : 'Import '.($run->status === 'partial' ? 'partly done, ' : 'done, ')).$summary.($run->error_message ? " {$run->error_message}" : ''))
+            ->with('run_id', $run->id);
+    }
+
+    /** A small CSV showing the columns, with an example row. Opens in Excel as UTF-8. */
+    public function importSample(Source $source): Response
+    {
+        $csv = "\xEF\xBB\xBF"
+            ."title,url,content,external_id,structured\r\n"
+            .'"Primary School Teacher at Example Council",,"Applications are invited from qualified teachers.'."\n"
+            .'Closing date: 30 April 2027.",EC-2027-001,"{""employer"": ""Example Council"", ""locations"": [{""locality"": ""Kitwe""}]}"'."\r\n"
+            .'"Driver at Example Mining","https://example.com/jobs/driver","Drive haul trucks on site.",,'."\r\n";
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="zamtrends-ads-sample.csv"',
+        ]);
     }
 
     /** Try the extraction rules as typed in the form on stored ads. Reads the database only. */

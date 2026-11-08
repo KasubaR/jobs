@@ -17,6 +17,7 @@ class CollectorRegistry
         'jobweb_feed' => JobWebFeedCollector::class,
         'manual_submission' => ManualSubmissionCollector::class,
         'html_listing' => HtmlListingCollector::class,
+        'python_worker' => PythonWorkerCollector::class,
     ];
 
     /** @return array<string, class-string<Collector>> */

@@ -41,6 +41,8 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
         Route::post('test', 'test')->name('test');
         Route::post('run', 'run')->name('run');
         Route::post('ads', 'addAd')->name('ads');
+        Route::post('import', 'importFile')->name('import');
+        Route::get('import-sample', 'importSample')->name('import-sample');
         Route::post('preview', 'previewExtraction')->name('preview');
     });
 });

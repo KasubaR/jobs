@@ -71,7 +71,11 @@ class SourceManager
         }
 
         // Manual sources have nothing to fetch, so they need no listing URL.
-        if ($source->collection_method !== 'manual' && blank($source->job_listing_url)) {
+        if ($source->collection_method === 'python' && blank($source->collector_config['python']['script'] ?? null)) {
+            $problems[] = 'No Python script is named. Set it in the "Python worker" settings.';
+        }
+
+        if (! in_array($source->collection_method, Source::EXTERNAL_METHODS, true) && blank($source->job_listing_url)) {
             $problems[] = 'The job listing URL is empty.';
         }
 
@@ -92,6 +96,10 @@ class SourceManager
      */
     public function runNow(Source $source): ?SourceRun
     {
+        if ($source->collection_method === 'python') {
+            throw new DomainException('This source is collected by the Python worker on your computer (collectors_py/run_due.py), not by the app.');
+        }
+
         if (! $source->is_active || $source->access_status !== 'approved' || $source->collection_method === 'manual') {
             throw new DomainException('Only an approved, active, automatic source can be run.');
         }
@@ -110,7 +118,7 @@ class SourceManager
     {
         $collector = $this->registry->for($source);
 
-        if (! $collector instanceof ManualSubmissionCollector) {
+        if (! $collector instanceof ManualSubmissionCollector || $source->collection_method !== 'manual') {
             throw new DomainException("'{$source->name}' is collected automatically; ads cannot be added by hand.");
         }
 

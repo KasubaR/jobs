@@ -49,8 +49,8 @@ class CollectSource implements ShouldBeUnique, ShouldQueue
     {
         $source = Source::find($this->sourceId);
 
-        // Gone, switched off, no longer approved, or manual: nothing to do.
-        if (! $source || ! $source->is_active || $source->access_status !== 'approved' || $source->collection_method === 'manual') {
+        // Gone, switched off, no longer approved, or not collected by the app (manual, Python worker): nothing to do.
+        if (! $source || ! $source->is_active || $source->access_status !== 'approved' || in_array($source->collection_method, Source::EXTERNAL_METHODS, true)) {
             return;
         }
 

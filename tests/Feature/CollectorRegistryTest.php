@@ -29,7 +29,7 @@ class CollectorRegistryTest extends TestCase
 
             $this->assertInstanceOf(Collector::class, $collector, $key);
             $this->assertInstanceOf(BaseCollector::class, $collector, "$key must extend BaseCollector so the shared rules apply");
-            $this->assertContains($collector->method(), ['rss', 'api', 'html', 'manual'], $key);
+            $this->assertContains($collector->method(), ['rss', 'api', 'html', 'manual', 'python'], $key);
             $this->assertIsArray($collector->configRules(), $key);
         }
     }

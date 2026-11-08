@@ -18,7 +18,7 @@ interface Collector
     /** Safe "is this reachable and readable?" test. Stores nothing. */
     public function check(Source $source): AccessCheck;
 
-    /** rss | api | html | manual */
+    /** rss | api | html | manual | python */
     public function method(): string;
 
     /**

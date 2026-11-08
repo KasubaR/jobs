@@ -23,8 +23,12 @@ class Source extends Model
         'api' => 'Public API',
         'html' => 'Public HTML pages',
         'manual' => 'Manual submission',
+        'python' => 'Python worker (runs on your computer)',
         'pending_review' => 'Not decided yet',
     ];
+
+    /** Methods where the app itself never fetches: ads arrive pasted/imported (manual) or from the Python worker. */
+    public const EXTERNAL_METHODS = ['manual', 'python'];
 
     public const FREQUENCIES = [
         'every_6_hours' => 'Every 6 hours',
@@ -127,7 +131,15 @@ class Source extends Model
     {
         return $query->where('is_active', true)
             ->where('access_status', 'approved')
-            ->where('collection_method', '!=', 'manual');
+            ->whereNotIn('collection_method', self::EXTERNAL_METHODS);
+    }
+
+    /** Approved, switched on, and collected by the Python worker on your computer. */
+    public function scopePythonWorker(Builder $query): Builder
+    {
+        return $query->where('is_active', true)
+            ->where('access_status', 'approved')
+            ->where('collection_method', 'python');
     }
 
     /** Never collected yet, or the next collection time has come. */

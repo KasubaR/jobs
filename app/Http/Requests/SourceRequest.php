@@ -49,6 +49,20 @@ class SourceRequest extends FormRequest
                 }
             }
 
+            if ($this->input('collector') === 'python_worker') {
+                $python = SourceFormData::python($this->all());
+
+                if (! preg_match('/^[a-z][a-z0-9_]{0,59}$/', $python['script'])) {
+                    $validator->errors()->add('python', 'The script name must be lowercase letters, digits and underscores (for example example_bs4): the name of a file in collectors_py/scripts.');
+                }
+                if ($python['optionsError']) {
+                    $validator->errors()->add('python', $python['optionsError']);
+                }
+                if ($this->input('collection_method') !== 'python') {
+                    $validator->errors()->add('collection_method', 'The Python worker collector needs the collection method "Python worker".');
+                }
+            }
+
             foreach (ExtractionRules::validate(SourceFormData::extraction($this->all())) as $problem) {
                 $validator->errors()->add('extraction', $problem);
             }

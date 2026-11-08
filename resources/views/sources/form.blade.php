@@ -60,6 +60,15 @@
     </div>
   </fieldset>
 
+  <fieldset class="fs" data-for-collector="python_worker" @if (old('collector', $source->collector) !== 'python_worker') hidden @endif><legend>Python worker</legend>
+    <p class="sub" style="margin-bottom:12px">For pages that need real parsing or a real browser. The app does not fetch this source. A Python program on your own computer (<code>collectors_py/run_due.py</code>) collects it and hands the ads over; the app then schedules, logs and backs off as for any source. Set the collection method to "Python worker".</p>
+    @php $py = $cfg['python'] ?? []; @endphp
+    <div class="fgrid">
+      <div class="field"><label for="python_script">Script</label><input id="python_script" name="python[script]" type="text" maxlength="60" placeholder="example_bs4" value="{{ old('python.script', $py['script'] ?? '') }}"><span class="help">The name of a file in <code>collectors_py/scripts</code>, without .py. Lowercase letters, digits and underscores.</span></div>
+      <div class="field"><label for="python_options">Options (JSON, optional)</label><textarea id="python_options" name="python[options]" maxlength="2000" style="min-height:70px" placeholder='{"max_pages": 3}'>{{ old('python.options', ! empty($py['options']) ? json_encode($py['options'], JSON_UNESCAPED_SLASHES) : '') }}</textarea><span class="help">Passed to the script. Keep it to settings such as page limits or selectors, never passwords or keys.</span></div>
+    </div>
+  </fieldset>
+
   <fieldset class="fs"><legend>Extraction rules</legend>
     <p class="sub" style="margin-bottom:12px">How to read this website's ads. Plain patterns, not code. Use "Preview extraction" to try them on stored ads before relying on them.</p>
     <div class="fgrid">

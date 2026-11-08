@@ -2,6 +2,7 @@
 @php
     use App\Models\Source;
     $manual = $source->collection_method === 'manual';
+    $python = $source->collection_method === 'python';
     $ready = $source->is_active && $source->access_status === 'approved';
 @endphp
 @section('title', $source->name)
@@ -20,11 +21,12 @@
       @if ($source->access_status !== 'restricted')
         <form method="POST" action="{{ route('sources.test', $source) }}">@csrf<button class="btn sm" type="submit">Test access</button></form>
       @endif
-      @if ($ready && ! $manual)
+      @if ($ready && ! $manual && ! $python)
         <form method="POST" action="{{ route('sources.run', $source) }}" data-confirm="Collect from {{ $source->name }} once, right now?">@csrf<button class="btn sm" type="submit">Run now</button></form>
       @endif
       @if ($ready && $manual)
         <button class="btn sm" type="button" data-open="ad-dlg">Add ad</button>
+        <button class="btn sm" type="button" data-open="import-dlg">Import file</button>
       @endif
       <button class="btn sm" type="button" data-open="access-dlg">Decide access</button>
       @if ($source->is_active)
@@ -54,7 +56,7 @@
       <dt>Collector</dt><dd>{{ $source->collector ?? 'none' }}</dd>
       <dt>Frequency</dt><dd>{{ Source::FREQUENCIES[$source->collection_frequency] ?? $source->collection_frequency }}, at least {{ $source->min_interval_seconds }}s between requests</dd>
       <dt>Last collected</dt><dd>{{ $source->last_collection_at?->format('j M Y H:i') ?? 'never' }}</dd>
-      <dt>Next due</dt><dd>{{ $manual ? 'Manual: ads are pasted in' : ($source->is_active ? ($source->next_collection_at?->format('j M Y H:i') ?? 'at the next check') : 'switched off') }}</dd>
+      <dt>Next due</dt><dd>{{ $manual ? 'Manual: ads are pasted in' : ($python ? ($source->is_active ? 'Due '.($source->next_collection_at?->format('j M Y H:i') ?? 'now').' (collected by the Python worker on your computer)' : 'switched off') : ($source->is_active ? ($source->next_collection_at?->format('j M Y H:i') ?? 'at the next check') : 'switched off')) }}</dd>
       <dt>Stored ads</dt><dd>{{ number_format($adsCount) }}@if ($adsCount) <span class="mut">({{ number_format($waitingCount) }} waiting to be processed@if ($structuredCount), {{ number_format($structuredCount) }} with structured job data@endif)</span>@endif</dd>
       <dt>Raw ad text</dt><dd>{{ $source->retain_raw ? 'Kept for 90 days' : 'Not kept' }}</dd>
       <dt>Access decided</dt><dd>{{ $source->access_decided_at?->format('j M Y H:i') ?? 'not yet' }}@if ($source->access_decision_note) <div class="mut">{{ $source->access_decision_note }}</div>@endif</dd>
@@ -101,6 +103,18 @@
     <div class="field" style="margin-top:14px"><label for="ad_url">Link (optional)</label><input id="ad_url" name="url" type="url" maxlength="500"><span class="help">Leave empty for a PDF or newspaper notice.</span></div>
     <div class="field" style="margin-top:14px"><label for="ad_content">Ad text</label><textarea id="ad_content" name="content" required maxlength="100000" style="min-height:180px"></textarea></div>
     <div class="acts"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">Add ad</button></div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="import-dlg" aria-labelledby="import-title">
+  <form method="POST" action="{{ route('sources.import', $source) }}" enctype="multipart/form-data">
+    @csrf
+    <h3 id="import-title">Import ads into {{ $source->name }}</h3>
+    <p class="sub">Upload a <b>.csv</b> or <b>.json</b> file of ads. They are stored as one run, with the same rules as a pasted ad: email addresses are removed and nothing is fetched from the web. A bad row is reported with its row number and the rest are still stored.</p>
+    <p class="sub" style="margin-top:10px"><b>CSV columns:</b> <code>title</code> and <code>content</code> are required; <code>url</code>, <code>external_id</code> and <code>structured</code> (JSON facts) are optional. First row = column names. At most {{ config('job_intel.import_max_rows') }} ads and {{ round(config('job_intel.import_max_bytes') / 1048576) }} MB per file.
+      <a href="{{ route('sources.import-sample', $source) }}">Download a sample CSV</a></p>
+    <div class="field" style="margin-top:14px"><label for="import_file">File</label><input id="import_file" name="file" type="file" accept=".csv,.json,text/csv,application/json" required></div>
+    <div class="acts"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit">Import</button></div>
   </form>
 </dialog>
 @endif

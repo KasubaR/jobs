@@ -52,6 +52,28 @@ class SourceFormData
         return $out;
     }
 
+    /** @return array{script:string,options:array<string,mixed>|null,optionsError:?string} */
+    public static function python(array $input): array
+    {
+        $python = (array) ($input['python'] ?? []);
+        $raw = trim((string) ($python['options'] ?? ''));
+        $options = null;
+        $error = null;
+
+        if ($raw !== '') {
+            $decoded = json_decode($raw, true, 5);
+            if (! is_array($decoded) || ($decoded !== [] && array_is_list($decoded))) {
+                $error = 'The options must be a JSON object, for example {"max_pages": 3}.';
+            } elseif (strlen($raw) > 2000) {
+                $error = 'The options are longer than 2,000 characters.';
+            } else {
+                $options = $decoded;
+            }
+        }
+
+        return ['script' => trim((string) ($python['script'] ?? '')), 'options' => $options, 'optionsError' => $error];
+    }
+
     /** What is saved in sources.collector_config. */
     public static function config(array $input, ?string $collector): ?array
     {
@@ -59,6 +81,11 @@ class SourceFormData
 
         if ($collector === 'html_listing') {
             $config['html'] = self::html($input);
+        }
+
+        if ($collector === 'python_worker') {
+            $python = self::python($input);
+            $config['python'] = ['script' => $python['script'], 'options' => $python['options'] ?? new \stdClass];
         }
 
         $extraction = self::extraction($input);
