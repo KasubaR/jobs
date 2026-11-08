@@ -71,6 +71,7 @@ class Source extends Model
         return [
             'is_active' => 'boolean',
             'retain_raw' => 'boolean',
+            'lists_all_open_ads' => 'boolean',
             'collector_config' => 'array',
             'last_collection_at' => 'datetime',
             'next_collection_at' => 'datetime',

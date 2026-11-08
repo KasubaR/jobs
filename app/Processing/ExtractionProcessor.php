@@ -21,7 +21,7 @@ class ExtractionProcessor implements RawPostProcessor
     /** Raised when the reading rules improve, so older jobs can be found and reprocessed. */
     public const VERSION = 1;
 
-    public function __construct(private JobExtractor $extractor) {}
+    public function __construct(private JobExtractor $extractor, private JobStatusService $status) {}
 
     public function process(RawJobPost $post): bool
     {
@@ -48,14 +48,18 @@ class ExtractionProcessor implements RawPostProcessor
             ];
 
             if ($job === null) {
-                return Job::create($data + ['first_seen_at' => $post->first_seen_at ?? now()]);
+                $job = Job::create($data + ['first_seen_at' => $post->first_seen_at ?? now(), 'status' => 'new']);
+                $this->status->started($job);
+            } else {
+                if ($job->review_status === 'reviewed') {
+                    $data['review_status'] = 'reviewed'; // a person's decision stays
+                }
+
+                $job->update($data);
             }
 
-            if ($job->review_status === 'reviewed') {
-                $data['review_status'] = 'reviewed'; // a person's decision stays
-            }
-
-            $job->update($data);
+            // The status follows the dates and the review state, never "it is still online".
+            $this->status->evaluate($job);
 
             return $job;
         });

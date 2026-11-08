@@ -37,6 +37,7 @@ php artisan schedule:work
 | `python:due [--json]` | List the approved, active Python-worker sources that are due (the worker asks this) |
 | `python:fail ID "reason" [--blocked]` | Record a failed or blocked Python-worker run so the source backs off |
 | `processing:dispatch [--limit=500]` | Queue the processing job for ads still waiting (needs `PROCESSING_ENABLED=true`) |
+| `jobs:sweep-status` | Re-check every job's status: expire past end dates, close ads a full-list source dropped, reopen ones that came back (scheduled daily at 04:00) |
 | `runs:cleanup` | Mark runs that never finished as failed (scheduled every 10 minutes) |
 | `raw:purge` | Clear raw ad text older than 90 days (scheduled daily) |
 
@@ -109,6 +110,20 @@ Every new or changed ad is stored as `pending` and raises a `RawJobPostStored` e
 3. **The title** (split into title and employer only when the source sets a title separator, for example ` at `).
 
 A field with no evidence stays empty. A date without a year ("by 30 November") is not read and no year is assumed. Each value remembers its evidence in `jobs.field_sources`. Ads scoring under 50 are flagged `needs_review`. The raw ad is never changed, an edited ad updates its job instead of adding one, and a job a person marked reviewed stays reviewed. Employer, place, qualification and experience stay as the ad wrote them; standardizing them is the next step. An ad with no title and no text at all is marked failed with the reason.
+
+### Job status (Phase 6, step 2)
+
+Every job has one status: **new, processing, published, expired, closed, rejected, duplicate**. An ad still being on a website is never the reason to call it open. The rules, first that applies wins:
+
+1. **duplicate** is left alone (duplicate detection owns it, a later step). **Rejected by a person** is left alone.
+2. **rejected** automatically only when the title starts like a notice, not a vacancy ("Tender for…", "Invitation to bid", "Request for proposals", "Expression of interest", "Public notice"). "Tender Clerk" is still a job.
+3. **expired** when the closing date has passed (the closing day itself is still open). With **no closing date** the job gets an *assumed end*: `ASSUMED_AD_AGE_DAYS` (default 45) after it was posted, or first seen if no posted date is known. It is shown as assumed, and a closing date the ad later gives replaces it.
+4. **closed** only for a source marked **"One run lists every ad that is currently open"**, and only when the ad was missing from 2 successful runs in a row. Failed, partial and empty runs prove nothing. Leave the setting off for feeds that show only the latest ads (JobWeb) or runs limited to the first pages. An ad that appears again reopens.
+5. **new** when too little could be read (it waits for a person), otherwise **published**.
+
+A person's decision (published, rejected) is kept, except that dates and the source can still expire or close it. Every change is written to `job_status_changes` with its reason and who made it. `jobs:sweep-status` runs daily so dates move jobs on without a new ad. `processing` is reserved for the standardizing and comparing steps.
+
+After deploying, run `php artisan migrate --force`, then `php artisan jobs:sweep-status` once to set the status of jobs that already exist.
 
 ## Lost phone
 

@@ -19,9 +19,16 @@ return [
     'import_max_bytes' => 5 * 1024 * 1024,
     'import_max_rows' => 500,
 
-    // Hand each stored or changed ad to the processing stage as a background job. Leave off until that
-    // stage exists: ads then wait as "pending" without queueing a job per ad (processing:dispatch can queue them later).
+    // Hand each stored or changed ad to the processing stage as a background job. Off by default: ads then wait
+    // as "pending" without a job per ad (processing:dispatch queues them later, once you switch this on).
     'processing_enabled' => (bool) env('PROCESSING_ENABLED', false),
+
+    // An ad with no closing date is not "open forever". It counts as ended this many days after it was posted
+    // (or first seen, when no posted date is known), and is shown as an assumed end.
+    'assumed_ad_age_days' => (int) env('ASSUMED_AD_AGE_DAYS', 45),
+
+    // Only for a source that lists every open ad: an ad missing from this many successful runs in a row is closed.
+    'closed_after_missing_runs' => 2,
 
     // A background collection job is stopped after this many seconds (needs the pcntl extension; without it
     // the stuck-run cleanup below still closes the run).
