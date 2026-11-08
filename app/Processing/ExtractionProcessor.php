@@ -4,6 +4,7 @@ namespace App\Processing;
 
 use App\Models\Job;
 use App\Models\RawJobPost;
+use App\Standardization\JobStandardizer;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -21,7 +22,7 @@ class ExtractionProcessor implements RawPostProcessor
     /** Raised when the reading rules improve, so older jobs can be found and reprocessed. */
     public const VERSION = 1;
 
-    public function __construct(private JobExtractor $extractor, private JobStatusService $status) {}
+    public function __construct(private JobExtractor $extractor, private JobStatusService $status, private JobStandardizer $standardizer) {}
 
     public function process(RawJobPost $post): bool
     {
@@ -57,6 +58,9 @@ class ExtractionProcessor implements RawPostProcessor
 
                 $job->update($data);
             }
+
+            // Standardized values and matching keys go next to what the ad wrote; the originals above are not touched.
+            $this->standardizer->standardize($job, $post);
 
             // The status follows the dates and the review state, never "it is still online".
             $this->status->evaluate($job);

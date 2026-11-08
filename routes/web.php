@@ -7,6 +7,7 @@ use App\Http\Controllers\RunController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\SourceActionController;
 use App\Http\Controllers\SourceController;
+use App\Http\Controllers\UnrecognizedValueController;
 use Illuminate\Support\Facades\Route;
 
 // ---- sign in / out ----
@@ -32,6 +33,9 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('/runs', [RunController::class, 'index'])->name('runs.index');
     Route::get('/runs/{run}', [RunController::class, 'show'])->name('runs.show');
+
+    Route::get('/values', [UnrecognizedValueController::class, 'index'])->name('values.index');
+    Route::post('/values', [UnrecognizedValueController::class, 'store'])->name('values.store');
 
     Route::resource('sources', SourceController::class);
     Route::prefix('sources/{source}')->name('sources.')->controller(SourceActionController::class)->group(function () {

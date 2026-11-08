@@ -16,6 +16,7 @@
         ['dashboard', 'Dashboard', 'dash', 'dashboard'],
         ['sources.index', 'Sources', 'globe', 'sources.*'],
         ['runs.index', 'Collection runs', 'clock', 'runs.*'],
+        ['values.index', 'Values to map', 'bars', 'values.*'],
         ['security', 'Security', 'lock', 'security'],
     ];
     $initial = strtoupper(substr(auth()->user()->name ?: auth()->user()->email, 0, 1));

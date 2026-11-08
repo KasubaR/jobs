@@ -37,6 +37,8 @@ php artisan schedule:work
 | `python:due [--json]` | List the approved, active Python-worker sources that are due (the worker asks this) |
 | `python:fail ID "reason" [--blocked]` | Record a failed or blocked Python-worker run so the source backs off |
 | `processing:dispatch [--limit=500]` | Queue the processing job for ads still waiting (needs `PROCESSING_ENABLED=true`) |
+| `jobs:standardize [--all]` | Standardize jobs and rebuild their matching keys (only jobs made with older rules, or all with `--all`) |
+| `terms:install` | Add any missing starting words and places to the dictionary (never overwrites a correction you made) |
 | `jobs:sweep-status` | Re-check every job's status: expire past end dates, close ads a full-list source dropped, reopen ones that came back (scheduled daily at 04:00) |
 | `runs:cleanup` | Mark runs that never finished as failed (scheduled every 10 minutes) |
 | `raw:purge` | Clear raw ad text older than 90 days (scheduled daily) |
@@ -124,6 +126,28 @@ Every job has one status: **new, processing, published, expired, closed, rejecte
 A person's decision (published, rejected) is kept, except that dates and the source can still expire or close it. Every change is written to `job_status_changes` with its reason and who made it. `jobs:sweep-status` runs daily so dates move jobs on without a new ad. `processing` is reserved for the standardizing and comparing steps.
 
 After deploying, run `php artisan migrate --force`, then `php artisan jobs:sweep-status` once to set the status of jobs that already exist.
+
+### Standardized values (Phase 6, step 3)
+
+Next to what the ad wrote, each job gets a standard form. **The original is never changed or replaced**: `employer_text`, `location_text`, `qualification_text`, `experience_text` and `employment_type` stay exactly as published.
+
+| The ad says | Standard form (columns) |
+|---|---|
+| Bachelor of Science, BSc Degree, B.Sc, Bachelor's | Bachelor's Degree (`qualification_level`, `_rank`, `_label`) |
+| Bachelor's in Accounting | Bachelor's Degree in Accounting (`qualification_field` = Accounting) |
+| Lusaka City, Lusaka, Zambia | Lusaka (`location_id`, a town in the Lusaka province) |
+| 3 years' experience, three (3) years, 36 months | 3 Years (`experience_min_months` = 36, `experience_label`) |
+| 2-3 years, minimum 5 years, 5+ years | 2–3 Years, 5+ Years |
+| FULL_TIME, CONTRACT | `["full_time","contract"]` (`employment_types`) |
+| Zamtel (Z) Ltd, ZAMTEL | one employer record (`employer_id`) |
+
+The words and places live in the database (`term_mappings`, `locations`), seeded with a starting set. Nothing is guessed: text the rules do not know, or that names two things ("Diploma or Degree", "5 years in mining and 2 in management"), is left unstandardized and listed under **Values to map** in the menu. There one decision (a level and field, years of experience, a job type or a place, or *Not applicable*) fixes every job waiting on that text, is remembered for later ads, and never touches the original. A correction you make is never overwritten by `terms:install`.
+
+### Matching keys (Phase 6, step 4)
+
+For duplicate detection each job also gets keys, again beside the originals: `match_title` (filler such as "URGENT", "Vacancy", reference numbers, position counts and " at Employer" removed), `match_employer` (legal endings removed), `match_location`, `match_url` (the application link without tracking parts), `match_date` (posted date, else first seen), and a text fingerprint (`content_fingerprint`, a 64-bit hash of the ad text without boilerplate, contact details and dates, plus `content_hash_norm` for exact copies). The fingerprint is kept after the raw text is cleared at 90 days. Two ads for the same vacancy on different sites get the same keys; `MatchingKeys::distance()` says how close two fingerprints are (0 identical, around 32 unrelated).
+
+After deploying, run `php artisan migrate --force` (installs the dictionary and places), then `php artisan jobs:standardize` once for jobs that already exist.
 
 ## Lost phone
 

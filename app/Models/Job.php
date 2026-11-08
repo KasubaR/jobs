@@ -34,6 +34,10 @@ class Job extends Model
             'first_seen_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'field_sources' => 'array',
+            'employment_types' => 'array',
+            'location_multiple' => 'boolean',
+            'match_date' => 'date',
+            'standardized_at' => 'datetime',
             'salary_min' => 'float',
             'salary_max' => 'float',
         ];

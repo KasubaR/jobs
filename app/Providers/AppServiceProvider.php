@@ -15,6 +15,9 @@ class AppServiceProvider extends ServiceProvider
         // duplicate detection, status) extend this class. PendingProcessor (leave ads pending) remains for tests.
         // Nothing runs until PROCESSING_ENABLED=true.
         $this->app->bind(\App\Processing\RawPostProcessor::class, \App\Processing\ExtractionProcessor::class);
+
+        // One dictionary per request or queued job, shared by every standardizer, so a changed mapping is seen by all.
+        $this->app->scoped(\App\Standardization\TermDictionary::class);
     }
 
     public function boot(): void
