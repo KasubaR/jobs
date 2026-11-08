@@ -2,6 +2,7 @@
 
 namespace App\Processing;
 
+use App\Duplicates\DuplicateDetector;
 use App\Models\Job;
 use App\Models\RawJobPost;
 use App\Standardization\JobStandardizer;
@@ -22,7 +23,12 @@ class ExtractionProcessor implements RawPostProcessor
     /** Raised when the reading rules improve, so older jobs can be found and reprocessed. */
     public const VERSION = 1;
 
-    public function __construct(private JobExtractor $extractor, private JobStatusService $status, private JobStandardizer $standardizer) {}
+    public function __construct(
+        private JobExtractor $extractor,
+        private JobStatusService $status,
+        private JobStandardizer $standardizer,
+        private DuplicateDetector $duplicates,
+    ) {}
 
     public function process(RawJobPost $post): bool
     {
@@ -64,6 +70,9 @@ class ExtractionProcessor implements RawPostProcessor
 
             // The status follows the dates and the review state, never "it is still online".
             $this->status->evaluate($job);
+
+            // Last: with the keys and the status in place, is this the same vacancy as one already known?
+            $this->duplicates->detect($job->refresh());
 
             return $job;
         });

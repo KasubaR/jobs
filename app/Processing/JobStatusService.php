@@ -99,6 +99,26 @@ class JobStatusService
         return $changes;
     }
 
+    /** Marks a job as a copy of another. The reason (and who decided) goes to the history. */
+    public function markDuplicate(Job $job, Job $main, string $reason, string $by = 'system'): void
+    {
+        $job->forceFill(['duplicate_of_job_id' => $main->id])->save();
+        $this->set($job, 'duplicate', $reason, $by);
+    }
+
+    /** Takes a job out of "duplicate": it stands alone again and its status is worked out afresh. */
+    public function release(Job $job, string $reason, string $by = 'system'): void
+    {
+        $from = $job->status;
+        $job->forceFill(['duplicate_of_job_id' => null, 'status' => 'new', 'status_reason' => $reason, 'status_by' => 'system', 'status_changed_at' => now()])->save();
+
+        if ($from !== 'new') {
+            $this->history($job, $from, 'new', $reason, $by);
+        }
+
+        $this->evaluate($job->refresh());
+    }
+
     /** The first history row for a new job. */
     public function started(Job $job): void
     {

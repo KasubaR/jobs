@@ -3,6 +3,8 @@
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DuplicateController;
+use App\Http\Controllers\JobController;
 use App\Http\Controllers\RunController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\SourceActionController;
@@ -33,6 +35,16 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('/runs', [RunController::class, 'index'])->name('runs.index');
     Route::get('/runs/{run}', [RunController::class, 'show'])->name('runs.show');
+
+    Route::get('/jobs', [JobController::class, 'index'])->name('jobs.index');
+    Route::get('/jobs/{job}', [JobController::class, 'show'])->whereNumber('job')->name('jobs.show');
+    Route::post('/jobs/{job}/status', [JobController::class, 'decide'])->whereNumber('job')->name('jobs.status');
+    Route::post('/jobs/{job}/approve', [JobController::class, 'approve'])->whereNumber('job')->name('jobs.approve');
+    Route::post('/jobs/{job}/separate', [JobController::class, 'separate'])->whereNumber('job')->name('jobs.separate');
+
+    Route::get('/duplicates', [DuplicateController::class, 'index'])->name('duplicates.index');
+    Route::post('/duplicates/{pair}/confirm', [DuplicateController::class, 'confirm'])->whereNumber('pair')->name('duplicates.confirm');
+    Route::post('/duplicates/{pair}/reject', [DuplicateController::class, 'reject'])->whereNumber('pair')->name('duplicates.reject');
 
     Route::get('/values', [UnrecognizedValueController::class, 'index'])->name('values.index');
     Route::post('/values', [UnrecognizedValueController::class, 'store'])->name('values.store');

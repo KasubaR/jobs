@@ -47,4 +47,16 @@ class Job extends Model
     {
         return $this->belongsTo(RawJobPost::class, 'raw_job_post_id');
     }
+
+    /** The source this job's ad came from. */
+    public function sourceId(): ?int
+    {
+        return $this->rawPost?->source_id;
+    }
+
+    /** The job this one is a copy of, when it is marked duplicate. */
+    public function duplicateOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'duplicate_of_job_id');
+    }
 }

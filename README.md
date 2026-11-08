@@ -149,6 +149,27 @@ For duplicate detection each job also gets keys, again beside the originals: `ma
 
 After deploying, run `php artisan migrate --force` (installs the dictionary and places), then `php artisan jobs:standardize` once for jobs that already exist.
 
+### Duplicate detection (Phase 6, step 5)
+
+The same vacancy is often on the employer's site and on several boards. After a job is read, standardized and given its status, it is compared with other jobs. A wrong merge hides a real vacancy, so the rules lean towards leaving things apart.
+
+1. **Candidates only.** Just jobs that share the employer, the title, the application link or the exact text, and were posted within 60 days. Nothing is compared with everything.
+2. **Certain matches.** The same specific application link, or the same ad text from the same employer, each only when the titles also agree (a generic "careers" link or a shared template proves nothing).
+3. **A score of 0 to 100** from employer (20), title (25), place (15), closing date (10), posting date (5), application link (5) and text (20). The weights and the lines are in `config/job_intel.php` (`duplicates`). From **90** the job is marked **duplicate** automatically; from **70** to 89 the pair waits on **Possible duplicates** for you; below 70 they are different vacancies.
+4. **Guards** (each recorded in the pair's breakdown): different places (unless the text is the same), posting dates more than 60 days apart, closing dates more than 30 days apart, an agency named as employer (the ad may not be theirs), and two ads from the same source never merge automatically. An ad with no text to compare scores at most 80, so unless it shares a specific application link it can be proposed but never merged.
+5. **The main ad** is the employer's own site first, then government, NGO, education, job boards, aggregators and media, then the oldest. The other ads become `duplicate` and point at the main one (`duplicate_of_job_id`, never a chain) and keep their own source, link and dates. If a better main ad arrives later, the group moves to it.
+6. **Editing and people.** When an ad changes and no longer matches, its link is undone and the stored pair dropped. A pair you reject is never proposed or linked again; a pair you confirm is linked again whenever it comes up. A link made by the system stays only while the pair would still qualify for it.
+
+`DUPLICATE_AUTO_SCORE` and `DUPLICATE_REVIEW_SCORE` in `.env` change the two lines. Start conservative and loosen them once you have seen real pairs.
+
+### The screens (Phase 6, step 6)
+
+- **Jobs**: every job with status, place, closing date and source; filter by status, source, search, or "needs review". A job page shows what the ad said beside the standard value and where each came from, its copies, its status history with reasons, and its reading log. From there you can **Publish**, **Reject** (with a reason, kept in the history), **Mark as reviewed** (publishes a thin ad you have checked), or say a copy **is a different vacancy**. A copy cannot be decided until it is separated.
+- **Possible duplicates**: each waiting pair side by side with the score breakdown and notes, a suggested main ad, and **Same vacancy** / **Different vacancies**. The latest automatic merges are listed below for checking.
+- **Values to map**: see step 3.
+
+Run `php artisan migrate --force` after deploying. Jobs already marked before this step are compared the next time their ad is processed.
+
 ## Lost phone
 
 If you turned two-factor on and lose your phone: use a recovery code at the code prompt. If those are lost too: `php artisan admin:reset-two-factor` (turns it off), then sign in with your password.

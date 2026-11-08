@@ -15,6 +15,8 @@
     $nav = [
         ['dashboard', 'Dashboard', 'dash', 'dashboard'],
         ['sources.index', 'Sources', 'globe', 'sources.*'],
+        ['jobs.index', 'Jobs', 'box', 'jobs.*'],
+        ['duplicates.index', 'Possible duplicates', 'users', 'duplicates.*'],
         ['runs.index', 'Collection runs', 'clock', 'runs.*'],
         ['values.index', 'Values to map', 'bars', 'values.*'],
         ['security', 'Security', 'lock', 'security'],

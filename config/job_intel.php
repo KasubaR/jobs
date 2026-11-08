@@ -30,6 +30,19 @@ return [
     // Only for a source that lists every open ad: an ad missing from this many successful runs in a row is closed.
     'closed_after_missing_runs' => 2,
 
+    // Duplicate detection. A wrong merge hides a real vacancy, so the automatic line is high and the middle goes to a person.
+    'duplicates' => [
+        'auto' => (int) env('DUPLICATE_AUTO_SCORE', 90),     // this score or more: marked duplicate automatically
+        'possible' => (int) env('DUPLICATE_REVIEW_SCORE', 70), // from here to just under "auto": shown for a person to decide
+        'window_days' => 60,                                  // only ads posted this close together are compared
+        'closing_conflict_days' => 30,                        // closing dates further apart than this: a new opening, not a copy
+        'identical_text_distance' => 3,                       // text fingerprints this close count as the same text
+        // Points per part; they add up to 100. Text counts most because it is hardest to fake by accident.
+        'weights' => ['employer' => 20, 'title' => 25, 'location' => 15, 'deadline' => 10, 'posted' => 5, 'url' => 5, 'text' => 20],
+        // An employer name like these is an agency: the ad may not be theirs, so the name proves little and nothing is merged automatically.
+        'agency_pattern' => '/\b(?:recruit\w*|staffing|manpower|headhunt\w*|talent|placement\w*|personnel|executive search|employment (?:agency|services)|(?:hr|human resources?) (?:consult\w*|solutions|services))\b/i',
+    ],
+
     // A background collection job is stopped after this many seconds (needs the pcntl extension; without it
     // the stuck-run cleanup below still closes the run).
     'collect_job_timeout' => (int) env('JOB_INTEL_COLLECT_TIMEOUT', 900),
