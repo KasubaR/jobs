@@ -162,7 +162,7 @@ class QualificationsPageTest extends TestCase
         $this->signIn();
         $this->four();
 
-        $this->page()->assertSee('1 of 4 vacancies has no qualification counted below')->assertSee('not read yet')->assertSee('share of the 3 that were read');
+        $this->page()->assertSee('1 of 4 vacancies has no qualification counted below')->assertSee('share of the 3 that were read');
     }
 
     public function test_there_is_no_warning_when_every_vacancy_states_a_qualification(): void
@@ -173,12 +173,54 @@ class QualificationsPageTest extends TestCase
         $this->page()->assertDontSee('no qualification counted below');
     }
 
-    public function test_skills_are_said_to_be_coming_not_faked(): void
+    /** A vacancy whose requirements section says $line, analysed by the real reader. */
+    private function wanting(string $line, int $times = 1): void
+    {
+        for ($i = 0; $i < $times; $i++) {
+            $n = random_int(1000, 9999999);
+            $this->vacancy("Officer {$n}", "Employer {$n} Ltd", [], "Requirements:<br>{$line}<br>Our office number {$n} serves clients near the {$n} road every working day.");
+        }
+    }
+
+    private function skillRows(): \Illuminate\Support\Collection
+    {
+        return $this->page()->viewData('skills')->keyBy('name');
+    }
+
+    public function test_skills_are_counted_from_the_whole_ad_once_per_vacancy(): void
     {
         $this->signIn();
-        $this->four();
+        $this->wanting('Proficiency in Microsoft Excel is required.', 2);
+        $this->wanting('Knowledge of budgeting is an added advantage.');   // an advantage is not "asked for"
 
-        $this->page()->assertSee('Skills are not read yet');
+        $skills = $this->skillRows();
+
+        $this->assertSame(2, $skills['Microsoft Excel']->vacancies);
+        $this->assertArrayNotHasKey('Budgeting', $skills->all());
+        $this->page()->assertDontSee('Skills are not read yet')->assertSee('Microsoft Excel')->assertSee('too few for a share');
+    }
+
+    public function test_a_skill_gets_a_share_only_from_five_vacancies(): void
+    {
+        $this->signIn();
+        $this->wanting('Proficiency in Microsoft Excel is required.', 5);
+
+        $row = $this->skillRows()['Microsoft Excel'];
+
+        $this->assertSame(5, $row->vacancies);
+        $this->assertSame(100.0, (float) $row->share);
+        $this->page()->assertSee('100%');
+    }
+
+    public function test_a_skill_on_a_removed_item_or_a_rejected_ad_is_not_counted(): void
+    {
+        $this->signIn();
+        $this->wanting('Proficiency in Microsoft Excel is required.', 2);
+        Job::orderBy('id')->first()->skills()->update(['removed' => true]);
+        Job::orderBy('id')->skip(1)->first()->update(['status' => 'rejected']);
+
+        $this->assertSame([], $this->skillRows()->all());
+        $this->page()->assertSee('No skill has been read');
     }
 
     // ---- filters ----

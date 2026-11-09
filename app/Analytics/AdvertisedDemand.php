@@ -76,6 +76,24 @@ class AdvertisedDemand
     }
 
     /**
+     * The skills asked for, most often first, by the same rules as the qualifications: each vacancy once, analysed
+     * vacancies only, required or preferred only, and a share only from MIN_SAMPLE vacancies.
+     *
+     * @return Collection<int, object{id:int, name:string, type:string, vacancies:int, required:int, share:?float, reliable:bool}>
+     */
+    public function skillsAsked(int $limit = 15): Collection
+    {
+        $analysed = max(1, $this->analysedQuery()->count());
+
+        return $this->analysedQuery()->join('job_skills as js', 'js.job_id', '=', 'jobs.id')->join('skills as s', 's.id', '=', 'js.skill_id')
+            ->where('js.removed', false)->whereIn('js.requirement_level', self::COUNTED)
+            ->groupBy('s.id', 's.name', 's.type')
+            ->selectRaw("s.id, s.name, s.type, count(distinct jobs.id) as vacancies, count(distinct case when js.requirement_level = 'required' then jobs.id end) as required")
+            ->orderByDesc('vacancies')->orderBy('s.name')->limit($limit)->get()
+            ->map(fn ($r) => $this->withShare($r, $analysed));
+    }
+
+    /**
      * Education levels asked for (a vacancy asking for either a diploma or a degree counts under both).
      *
      * @return Collection<int, object{key:string, name:string, vacancies:int, share:?float, reliable:bool}>

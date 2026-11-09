@@ -37,7 +37,7 @@
     <div class="alert warn" style="margin:16px 0 0">
       <b>{{ $total - $read }} of {{ $total }} {{ Str::plural('vacancy', $total) }} {{ $total - $read === 1 ? 'has' : 'have' }} no qualification counted below.</b>
       The reader only picks up a qualification written on a labelled line ("Qualification: …") or as a requirements bullet that starts with it.
-      A qualification written inside a sentence is not read yet. Reading the whole ad is the next build step, and it will raise these numbers.
+      A qualification written inside a sentence is not counted in these four panels; the Insights page counts those from the whole ad.
       Every figure below is a share of the {{ $read }} that were read, not of all {{ $total }}.
     </div>
   @endif
@@ -91,8 +91,13 @@
 </section>
 
 <section class="card">
-  <div class="hd"><div><h3>Skills</h3><p class="sub">Technical and soft skills employers ask for</p></div></div>
-  <p class="empty" style="text-align:left">Skills are not read yet. They come from the next build step, which reads the whole ad and grades each skill and qualification as required, preferred, an added advantage, or only mentioned, so that "most sought after" means what employers actually require.</p>
+  <div class="hd"><div><h3>Skills</h3><p class="sub">Required or preferred, of {{ number_format($skillVacancies) }} {{ Str::plural('vacancy', $skillVacancies) }} the reader has analysed. Added advantages and passing mentions are not counted.</p></div></div>
+  @forelse ($skills as $i => $row)
+    <div class="rm"><div class="h"><b>{{ $row->name }}</b><span>{{ $row->share !== null ? $row->share.'%' : 'too few for a share' }}</span><em>{{ number_format($row->vacancies) }}</em></div>
+      <div class="bar"><i class="{{ $i === 0 ? 'hi' : '' }}" style="width:{{ max(3, $pct((int) $row->vacancies, (int) $skills->max('vacancies'))) }}%"></i></div></div>
+  @empty
+    <p class="empty" style="text-align:left">No skill has been read as required or preferred in an analysed vacancy yet.</p>
+  @endforelse
 </section>
 @endif
 @endsection

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Analytics\AdvertisedDemand;
 use App\Models\Job;
 use App\Standardization\DefaultTerms;
 use Illuminate\Http\Request;
@@ -13,8 +14,8 @@ use Illuminate\View\View;
  * What employers ask for, counted once per vacancy. A vacancy found on three sites is one vacancy (the copies and the
  * rejected ads are left out), so a qualification is never made to look more popular than it is.
  *
- * Today each vacancy has the one qualification and the experience the ad stated in a form the reader recognises.
- * Reading the whole body of the ad, and the skills, is the next build step; this page will then draw on that.
+ * The qualification and experience figures come from what the ad stated in a form the reader recognises; the skills
+ * come from the reader of the whole ad, through AdvertisedDemand (required and preferred only).
  */
 class QualificationController extends Controller
 {
@@ -58,7 +59,11 @@ class QualificationController extends Controller
         $labels = $this->ranked($labelCounts);
         $fields = $this->ranked($fieldCounts);
 
+        $demand = new AdvertisedDemand($scope, $province ? (int) $province : null);
+
         return view('qualifications.index', [
+            'skills' => $demand->skillsAsked(self::TOP),
+            'skillVacancies' => $demand->analysedQuery()->count(),
             'filters' => ['scope' => $scope, 'province' => $province],
             'provinces' => DB::table('locations')->where('type', 'province')->orderBy('name')->pluck('name', 'id'),
             'total' => $total,
