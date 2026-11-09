@@ -40,6 +40,8 @@ php artisan schedule:work
 | `jobs:standardize [--all]` | Standardize jobs and rebuild their matching keys (only jobs made with older rules, or all with `--all`) |
 | `terms:install` | Add any missing starting words and places to the dictionary (never overwrites a correction you made) |
 | `taxonomy:install` | Add any missing skills, qualifications, fields, occupations and industries to the taxonomy (never changes an existing row) |
+| `directory:import TYPE FILE` | Load `organizations`, `qualifications`, `recognitions` or `programmes` into the qualification directory from a CSV (see below) |
+| `stats:rebuild` | Recount which occupations, skills and industries go with each qualification (scheduled daily at 04:30) |
 | `jobs:sweep-status` | Re-check every job's status: expire past end dates, close ads a full-list source dropped, reopen ones that came back (scheduled daily at 04:00) |
 | `runs:cleanup` | Mark runs that never finished as failed (scheduled every 10 minutes) |
 | `raw:purge` | Clear raw ad text older than 90 days (scheduled daily) |
@@ -225,3 +227,18 @@ No test reaches a real website: `Tests\TestCase` forbids any request a test has 
 ### A source that keeps no text
 
 Some sources are set not to keep ad text (`retain_raw` off, for example where the site's terms forbid it). For those no text fingerprint is made, and nothing text-derived is stored. Their ads can still be matched on employer, title, place and dates and are proposed for review, but they cannot reach the automatic line (an ad with no text scores at most 80) unless they share a specific application link. That is deliberate: merging on text would mean keeping the text.
+
+## Loading the qualification directory from CSV
+
+`php artisan directory:import TYPE file.csv`. Comma, semicolon or tab separated; UTF-8 or Windows-1252. The first row names the columns; a column you leave out is left alone on re-import. Records are matched on their key, so loading a file again updates rather than duplicates, and a bad row is reported by row number while the rest are stored. Load in this order, because later files refer to earlier ones by `key`.
+
+| Type | Columns (required first) |
+|---|---|
+| `organizations` | `key, name, type` (awarding_body, professional_body, university, college, regulator, exam_board), `country, website, aliases` |
+| `qualifications` | `key, name, kind` (academic, professional, registration, vocational, short_course), `level, field, awarding_organization, duration_months, entry_requirements, aliases` |
+| `recognitions` | `qualification, authority, status` (accredited, registered, recognised, not_recognised, unknown), `scope, reference, valid_from, valid_to` |
+| `programmes` | `qualification, provider`, `name, mode, duration_months, location, accreditation_status, url` |
+
+`aliases` are separated by `|`. `level` is a qualification level key (school, certificate, diploma, bachelor, postgraduate, masters, phd) and `field` a field-of-study key.
+
+**Sources.** Qualifications, recognitions and programmes files may add `source_url`, `source_document`, `note`, `verified_on` (YYYY-MM-DD) and `verified_by`. A source is saved as evidence. A record is only marked verified when a row has a source **and** a `verified_on` date, so nothing shows as verified without something to point at.
