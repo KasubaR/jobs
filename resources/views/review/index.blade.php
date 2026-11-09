@@ -33,7 +33,7 @@
               <input type="hidden" name="wording" value="{{ $row->wording }}">
               <input type="hidden" name="level" value="{{ $row->level }}">
               @if ($row->level)
-                <select name="field_id" aria-label="Field of study">
+                <select name="field_id" aria-label="Field of study" required>
                   <option value="">Field…</option>
                   @foreach ($fields as $f)<option value="{{ $f->id }}">{{ $f->parent ? $f->parent.' › ' : '' }}{{ $f->name }}</option>@endforeach
                 </select>

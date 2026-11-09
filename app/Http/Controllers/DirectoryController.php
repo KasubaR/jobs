@@ -143,6 +143,8 @@ class DirectoryController extends Controller
         ];
 
         $out = ['sample' => (int) ($stats->flatten()->first()->qualification_jobs ?? 0), 'computed_at' => $stats->flatten()->first()->computed_at ?? null];
+        // a vacancy has one occupation and one industry, so these add up to how many vacancies the figure is known for
+        $out['known'] = ['occupation' => (int) ($stats['occupation'] ?? collect())->sum('jobs'), 'industry' => (int) ($stats['industry'] ?? collect())->sum('jobs')];
         foreach ($names as $type => $lookup) {
             $out[$type] = ($stats[$type] ?? collect())->take(self::TOP)->map(fn ($s) => (object) [
                 'name' => $lookup[$s->target] ?? $s->target, 'jobs' => $s->jobs, 'share' => $s->qualification_jobs > 0 ? round($s->jobs / $s->qualification_jobs * 100) : 0,

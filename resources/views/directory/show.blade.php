@@ -75,11 +75,14 @@
         @foreach (['occupation' => 'Occupations', 'skill' => 'Skills', 'industry' => 'Industries'] as $type => $title)
           <div>
             <b>{{ $title }}</b>
+            @if (isset($links['known'][$type]))
+              <br><small>Known for {{ $links['known'][$type] }} of {{ $links['sample'] }} {{ Str::plural('vacancy', $links['sample']) }}</small>
+            @endif
             @forelse ($links[$type] as $row)
               <div class="rm"><div class="h"><b>{{ $row->name }}</b><span>{{ $row->share }}%</span><em>{{ $row->jobs }}</em></div>
                 <div class="bar"><i style="width:{{ max(3, $row->share) }}%"></i></div></div>
             @empty
-              <p class="empty">None recorded.</p>
+              <p class="empty">{{ $type === 'skill' ? 'None. Only skills an ad requires or prefers are counted, not ones it only mentions.' : 'None recorded.' }}</p>
             @endforelse
           </div>
         @endforeach
