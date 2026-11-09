@@ -58,12 +58,12 @@
   </div>
 
   <div class="card">
-    <div class="hd"><div><h3>Most requested qualifications</h3><p class="sub">The qualification as standardized, with its field</p></div></div>
+    <div class="hd"><div><h3>Most requested qualifications</h3><p class="sub">Level and subject, of {{ number_format($labelsNamed) }} {{ Str::plural('vacancy', $labelsNamed) }} that name a subject</p></div></div>
     @forelse ($labels as $i => $row)
-      <div class="rm"><div class="h"><b>{{ $row['name'] }}</b><span>{{ $pct($row['n'], $read) }}%</span><em>{{ number_format($row['n']) }}</em></div>
+      <div class="rm"><div class="h"><b>{{ $row['name'] }}</b><span>{{ $pct($row['n'], $labelsNamed) }}%</span><em>{{ number_format($row['n']) }}</em></div>
         <div class="bar"><i class="{{ $i === 0 ? 'hi' : '' }}" style="width:{{ max(3, $pct($row['n'], (int) $labels->max('n'))) }}%"></i></div></div>
     @empty
-      <p class="empty">Nothing to rank yet.</p>
+      <p class="empty">No ad names both a level and a subject yet.</p>
     @endforelse
   </div>
 </section>

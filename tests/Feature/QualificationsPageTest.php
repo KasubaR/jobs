@@ -105,6 +105,23 @@ class QualificationsPageTest extends TestCase
         $r->assertSee("Bachelor's Degree")->assertSee('67%')->assertSee('33%');
     }
 
+    public function test_a_list_of_subjects_counts_each_subject_once(): void
+    {
+        $this->signIn();
+        $this->vacancy('Buyer', 'Alpha Ltd', ['education' => 'Degree in Supply Chain Management, Procurement, Banking & Finance, Law or Engineering']);
+        $this->vacancy('Clerk', 'Beta Ltd', ['education' => 'Degree in Procurement']);
+
+        $r = $this->page()->assertOk();
+
+        $labels = $r->viewData('labels')->pluck('n', 'name')->all();
+        $this->assertSame(2, $labels['Degree in Procurement']);
+        foreach (['Supply Chain Management', 'Banking & Finance', 'Law', 'Engineering'] as $subject) {
+            $this->assertSame(1, $labels["Degree in {$subject}"], $subject);
+        }
+        $this->assertSame(2, $r->viewData('fields')->pluck('n', 'name')->all()['Procurement']);
+        $this->assertSame(2, $r->viewData('labelsNamed'));
+    }
+
     public function test_a_vacancy_on_several_sites_counts_once_and_rejected_ads_not_at_all(): void
     {
         $this->signIn();
@@ -208,7 +225,7 @@ class QualificationsPageTest extends TestCase
     {
         $this->signIn();
         $job = $this->vacancy('Accountant', 'Alpha Ltd', ['education' => 'Bachelor of Science']);
-        $job->update(['qualification_label' => '<script>alert(1)</script>', 'qualification_field' => '<img src=x onerror=alert(2)>']);
+        $job->update(['qualification_field' => '<script>alert(1)</script>, <img src=x onerror=alert(2)>']);
 
         $this->page()->assertDontSee('<script>alert(1)</script>', false)->assertDontSee('<img src=x', false)->assertSee('&lt;script&gt;', false);
     }

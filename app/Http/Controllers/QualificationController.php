@@ -44,6 +44,20 @@ class QualificationController extends Controller
         $levels = $base()->whereNotNull('qualification_level')
             ->selectRaw('qualification_level as k, qualification_rank as r, count(*) as n')->groupBy('qualification_level', 'qualification_rank')->orderByDesc('n')->get();
 
+        // "Degree in Law, Procurement, Engineering" asks for three different qualifications: each counts once for that vacancy
+        $withField = $base()->whereNotNull('qualification_field')->get(['qualification_level', 'qualification_field']);
+        $labelCounts = [];
+        $fieldCounts = [];
+        foreach ($withField as $job) {
+            $level = DefaultTerms::LEVELS[$job->qualification_level][0] ?? ucfirst((string) $job->qualification_level);
+            foreach ($this->subjects($job->qualification_field) as $subject) {
+                $fieldCounts[$subject] = ($fieldCounts[$subject] ?? 0) + 1;
+                $labelCounts["{$level} in {$subject}"] = ($labelCounts["{$level} in {$subject}"] ?? 0) + 1;
+            }
+        }
+        $labels = $this->ranked($labelCounts);
+        $fields = $this->ranked($fieldCounts);
+
         return view('qualifications.index', [
             'filters' => ['scope' => $scope, 'province' => $province],
             'provinces' => DB::table('locations')->where('type', 'province')->orderBy('name')->pluck('name', 'id'),
@@ -52,8 +66,10 @@ class QualificationController extends Controller
             'notRecognised' => $notRecognised,
             'nothing' => max(0, $total - $read - $notRecognised),
             'levels' => $levels->map(fn ($l) => ['name' => DefaultTerms::LEVELS[$l->k][0] ?? ucfirst($l->k), 'n' => (int) $l->n]),
-            'labels' => $this->top($base()->whereNotNull('qualification_label'), 'qualification_label'),
-            'fields' => $this->top($base()->whereNotNull('qualification_field'), 'qualification_field'),
+            // only qualifications that name a subject: a bare level ("Diploma") is already in the Education level card
+            'labels' => $labels,
+            'labelsNamed' => $withField->count(),
+            'fields' => $fields,
             'experienceRead' => $experienceRead,
             'experience' => $base()->whereNotNull('experience_label')
                 ->selectRaw('experience_label as name, min(experience_min_months) as months, count(*) as n')->groupBy('experience_label')->orderByDesc('n')->limit(10)->get()
@@ -61,10 +77,30 @@ class QualificationController extends Controller
         ]);
     }
 
-    /** @return \Illuminate\Support\Collection<int, array{name: string, n: int}> */
-    private function top($query, string $column)
+    /**
+     * The separate subjects in a field of study. Commas, semicolons, "/" and " or " separate them; "and" and "&" do not,
+     * because "Banking & Finance" and "Science and Technology" are one subject each.
+     *
+     * @return list<string>
+     */
+    private function subjects(string $field): array
     {
-        return $query->selectRaw("{$column} as name, count(*) as n")->groupBy($column)->orderByDesc('n')->orderBy($column)->limit(self::TOP)->get()
-            ->map(fn ($r) => ['name' => $r->name, 'n' => (int) $r->n]);
+        $seen = [];
+        foreach (preg_split('/\s*[,;\/]\s*(?:(?:or|and)\s+)?|\s+or\s+/iu', $field) as $part) {
+            $part = trim($part, " \t.");
+            if ($part !== '') {
+                $seen[mb_strtolower($part)] ??= mb_strtoupper(mb_substr($part, 0, 1)).mb_substr($part, 1);
+            }
+        }
+
+        return array_values($seen);
+    }
+
+    /** @param array<string, int> $counts @return \Illuminate\Support\Collection<int, array{name: string, n: int}> */
+    private function ranked(array $counts)
+    {
+        $rows = collect($counts)->map(fn ($n, $name) => ['name' => (string) $name, 'n' => $n])->values();
+
+        return $rows->sort(fn ($a, $b) => [$b['n'], $a['name']] <=> [$a['n'], $b['name']])->take(self::TOP)->values();
     }
 }
