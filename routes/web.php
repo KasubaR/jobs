@@ -7,6 +7,7 @@ use App\Http\Controllers\DuplicateController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\DirectoryController;
 use App\Http\Controllers\QualificationController;
+use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RunController;
 use App\Http\Controllers\SecurityController;
 use App\Http\Controllers\SourceActionController;
@@ -53,7 +54,10 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
     Route::post('/duplicates/{pair}/confirm', [DuplicateController::class, 'confirm'])->whereNumber('pair')->name('duplicates.confirm');
     Route::post('/duplicates/{pair}/reject', [DuplicateController::class, 'reject'])->whereNumber('pair')->name('duplicates.reject');
 
-    Route::get('/values', [UnrecognizedValueController::class, 'index'])->name('values.index');
+    Route::get('/review', [ReviewController::class, 'index'])->name('review.index');
+    Route::post('/review', [ReviewController::class, 'store'])->name('review.store');
+
+    Route::get('/values',[UnrecognizedValueController::class, 'index'])->name('values.index');
     Route::post('/values', [UnrecognizedValueController::class, 'store'])->name('values.store');
 
     Route::resource('sources', SourceController::class);

@@ -125,7 +125,7 @@ class RequirementApplier
      * "Bachelor's in Accounting", "BSc in Accountancy" and "First Degree in Accounting" are one directory entry:
      * bachelor + accounting. Found or created here (unverified, origin 'extraction') so it has a profile, demand and links.
      */
-    private function levelFieldEntry(string $level, int $fieldId): ?int
+    public function levelFieldEntry(string $level, int $fieldId): ?int
     {
         $levelRow = DB::table('qualification_levels')->where('key', $level)->first();
         $field = DB::table('fields_of_study')->where('id', $fieldId)->first();

@@ -20,6 +20,7 @@
         ['duplicates.index', 'Possible duplicates', 'users', 'duplicates.*'],
         ['sources.index', 'Sources', 'globe', 'sources.*'],
         ['runs.index', 'Collection runs', 'clock', 'runs.*'],
+        ['review.index', 'Review readings', 'find', 'review.*'],
         ['values.index', 'Values to map', 'find', 'values.*'],
         ['security', 'Security', 'lock', 'security'],
     ];
