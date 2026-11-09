@@ -30,7 +30,14 @@ class MatchingKeys
     private const TRACKING = '~^(?:utm_.*|fbclid|gclid|msclkid|mc_[a-z]+|ref|ref_src|source|src|trk|trackingid|igshid|_ga|campaign)$~i';
 
     /** Lines of an ad that every site words differently: not part of what the vacancy is. */
-    private const BOILERPLATE_LINE = '~(?:how to apply|to apply|apply now|apply online|apply here|click here|closing date|deadline|date posted|posted on|published on|share this|follow us|all rights reserved|job reference|reference number|ref(?:erence)? ?no|view all jobs|similar jobs|back to jobs|return to jobs|print this|^\s*(?:employer|company|organi[sz]ation|location|duty station|salary|job type|employment type|qualifications?|experience)\s*:)~iu';
+    /** Lines up to this long that mention boilerplate are dropped whole; longer ones are cleaned a sentence at a time. */
+    private const SHORT_LINE = 300;
+
+    /** A sentence every site words differently and that says nothing about what the job is. */
+    private const BOILERPLATE_SENTENCE = '~(?:how to apply|to apply|apply now|apply online|apply here|click here|closing date|deadline|date posted|posted on|published on|share this|follow us|all rights reserved|job reference|reference number|ref(?:erence)? ?no|view all jobs|similar jobs|back to jobs|return to jobs|print this)~iu';
+
+    /** A line that starts with a label ("Location: Kitwe"): a fact kept elsewhere, worded differently on every site. */
+    private const LABEL_LINE = '~^\s*(?:employer|company|organi[sz]ation|location|duty station|salary|job type|employment type|qualifications?|experience)\s*:~iu';
 
     private const STOPWORDS = ['the', 'and', 'for', 'are', 'you', 'our', 'with', 'will', 'have', 'has', 'that', 'this', 'from', 'your', 'who', 'all', 'any', 'can', 'not', 'but', 'its', 'their', 'they', 'been', 'must', 'also', 'such', 'other', 'than', 'into', 'work', 'job', 'role', 'position'];
 
@@ -157,8 +164,30 @@ class MatchingKeys
     /** @return list<string> the meaningful words of an ad text, in order */
     public static function words(string $content): array
     {
-        $lines = array_filter(explode("\n", mb_strtolower(Text::plain($content))), fn ($l) => trim($l) !== '' && ! preg_match(self::BOILERPLATE_LINE, $l));
-        $text = implode(' ', $lines);
+        // A short line with boilerplate in it ("How to apply: ...") is boilerplate all through and is dropped whole.
+        // A long line is the ad's own text with some boilerplate inside it (an ad that is one paragraph beginning
+        // "Closing date: 15 December 2026."), so only the boilerplate sentences go and the rest is kept.
+        $kept = [];
+        foreach (explode("\n", mb_strtolower(Text::plain($content))) as $line) {
+            if (trim($line) === '' || preg_match(self::LABEL_LINE, $line)) {
+                continue;
+            }
+
+            if (mb_strlen($line) <= self::SHORT_LINE) {
+                if (! preg_match(self::BOILERPLATE_SENTENCE, $line)) {
+                    $kept[] = $line;
+                }
+
+                continue;
+            }
+
+            foreach (preg_split('/(?<=[.!?])\s+/u', $line) as $sentence) {
+                if (trim($sentence) !== '' && ! preg_match(self::BOILERPLATE_SENTENCE, $sentence)) {
+                    $kept[] = $sentence;
+                }
+            }
+        }
+        $text = implode(' ', $kept);
         $text = preg_replace('~https?://\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+~u', ' ', $text);
         $text = preg_replace('/\+?\d[\d\s\-()]{6,}\d/u', ' ', $text); // phone numbers
         $text = preg_replace('/\b\d{1,2}(?:st|nd|rd|th)?\s+[a-z]{3,9},?\s+\d{4}\b|\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b/u', ' ', $text); // dates

@@ -39,26 +39,42 @@ class DuplicateDetector
         $out['released'] += $this->verify($job) ? 1 : 0;
         $this->refreshPairs($job);
 
-        foreach ($this->candidates($job) as $other) {
-            if ($this->root($other)->id === $this->root($job)->id) {
+        // A vacancy found on three sites is one group. The job is compared with each group once, through the member
+        // it matches best, so a reviewer is asked one question per group and not one per copy.
+        foreach ($this->candidates($job)->groupBy(fn ($o) => $this->root($o)->id) as $rootId => $members) {
+            if ($rootId === $this->root($job)->id) {
                 continue; // already in the same group
             }
 
-            [$a, $b] = $job->id < $other->id ? [$job, $other] : [$other, $job];
-            $pair = $this->pair($a, $b);
+            $best = null;
 
-            if ($pair?->outcome === 'rejected') {
+            foreach ($members as $other) {
+                [$a, $b] = $job->id < $other->id ? [$job, $other] : [$other, $job];
+                $pair = $this->pair($a, $b);
+
+                if ($pair?->outcome === 'rejected') {
+                    continue; // a person said these two are different
+                }
+
+                if ($pair?->outcome === 'confirmed') {
+                    $this->link($a, $b, 'a person confirmed it');
+                    $out['linked']++;
+
+                    continue 2;
+                }
+
+                $result = $this->scorer->score($a, $b);
+
+                if ($best === null || $result['score'] > $best['result']['score']) {
+                    $best = ['a' => $a, 'b' => $b, 'pair' => $pair, 'result' => $result];
+                }
+            }
+
+            if ($best === null) {
                 continue;
             }
 
-            $result = $this->scorer->score($a, $b);
-
-            if ($pair?->outcome === 'confirmed') {
-                $this->link($a, $b, 'a person confirmed it');
-                $out['linked']++;
-
-                continue;
-            }
+            ['a' => $a, 'b' => $b, 'pair' => $pair, 'result' => $result] = $best;
 
             if ($this->qualifies($result)) {
                 $this->record($a, $b, $result, 'auto');
@@ -71,6 +87,8 @@ class DuplicateDetector
                 DB::table('job_duplicate_candidates')->where('id', $pair->id)->delete(); // no longer looks like one
             }
         }
+
+        $this->settlePairs($this->root($job));
 
         return $out;
     }
@@ -86,6 +104,21 @@ class DuplicateDetector
     public function reject(object $pair): void
     {
         DB::table('job_duplicate_candidates')->where('id', $pair->id)->update(['outcome' => 'rejected', 'decided_by' => 'person', 'decided_at' => now(), 'updated_at' => now()]);
+
+        // "Different" is said about the vacancy, not about one copy of it: the same goes for every ad in either group,
+        // so the same question does not come back through another copy.
+        $left = $this->group(Job::findOrFail($pair->job_a_id));
+        $right = $this->group(Job::findOrFail($pair->job_b_id));
+        foreach ($left as $x) {
+            foreach ($right as $y) {
+                [$lo, $hi] = $x < $y ? [$x, $y] : [$y, $x];
+                $now = now();
+                DB::table('job_duplicate_candidates')->updateOrInsert(['job_a_id' => $lo, 'job_b_id' => $hi], [
+                    'score' => min(100, (int) ($pair->score ?? 0)), 'reason' => 'score', 'outcome' => 'rejected',
+                    'decided_by' => 'person', 'decided_at' => $now, 'created_at' => $now, 'updated_at' => $now,
+                ]);
+            }
+        }
 
         foreach ([[$pair->job_a_id, $pair->job_b_id], [$pair->job_b_id, $pair->job_a_id]] as [$child, $main]) {
             $job = Job::find($child);
@@ -109,6 +142,41 @@ class DuplicateDetector
         ]);
 
         $this->status->release($job, 'A person said this is a different vacancy.', 'person');
+    }
+
+    /** @return list<int> the ids of a job's whole group: its main job and every copy */
+    private function group(Job $job): array
+    {
+        $root = $this->root($job);
+
+        return array_map('intval', [$root->id, ...Job::where('duplicate_of_job_id', $root->id)->pluck('id')->all()]);
+    }
+
+    /**
+     * Questions that no longer need asking, for a group: a pair waiting for a decision whose two ads are now in one group,
+     * and, when several pairs ask about the same two groups, all but the best-scoring one.
+     */
+    private function settlePairs(Job $main): void
+    {
+        $group = $this->group($main);
+
+        DB::table('job_duplicate_candidates')->where('outcome', 'possible')->whereIn('job_a_id', $group)->whereIn('job_b_id', $group)->delete();
+
+        $byOtherGroup = [];
+        $rows = DB::table('job_duplicate_candidates')->where('outcome', 'possible')
+            ->where(fn ($q) => $q->whereIn('job_a_id', $group)->orWhereIn('job_b_id', $group))->get();
+
+        foreach ($rows as $row) {
+            $other = Job::find(in_array($row->job_a_id, $group, true) ? $row->job_b_id : $row->job_a_id);
+            if ($other) {
+                $byOtherGroup[$this->root($other)->id][] = $row;
+            }
+        }
+
+        foreach ($byOtherGroup as $pairs) {
+            usort($pairs, fn ($x, $y) => [$y->score, $x->id] <=> [$x->score, $y->id]); // best score first, then the oldest
+            DB::table('job_duplicate_candidates')->whereIn('id', array_map(fn ($p) => $p->id, array_slice($pairs, 1)))->delete();
+        }
     }
 
     /** The job at the top of a copy's chain. */
@@ -244,9 +312,12 @@ class DuplicateDetector
             return;
         }
 
+        // Choosing a copy as the main one means choosing its group.
+        $chosen = $mainId === null ? null : ($this->root(Job::find($mainId) ?? $ra)->id);
+
         $main = match (true) {
-            $mainId === $ra->id => $ra,
-            $mainId === $rb->id => $rb,
+            $chosen === $ra->id => $ra,
+            $chosen === $rb->id => $rb,
             default => $this->preferred($ra, $rb),
         };
         $child = $main->id === $ra->id ? $rb : $ra;
@@ -254,6 +325,7 @@ class DuplicateDetector
         DB::transaction(function () use ($main, $child, $why, $by) {
             Job::where('duplicate_of_job_id', $child->id)->update(['duplicate_of_job_id' => $main->id]); // its copies follow it
             $this->status->markDuplicate($child, $main, "Same vacancy as job #{$main->id}: {$why}.", $by);
+            $this->settlePairs($main);
         });
     }
 

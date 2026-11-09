@@ -36,7 +36,7 @@ php artisan schedule:work
 | `collect:import FILE --source=ID\|NAME [--json]` | Import a CSV or JSON file of ads into an approved, active manual source |
 | `python:due [--json]` | List the approved, active Python-worker sources that are due (the worker asks this) |
 | `python:fail ID "reason" [--blocked]` | Record a failed or blocked Python-worker run so the source backs off |
-| `processing:dispatch [--limit=500]` | Queue the processing job for ads still waiting (needs `PROCESSING_ENABLED=true`) |
+| `processing:dispatch [--limit=500] [--outdated] [--failed]` | Queue the processing job for ads still waiting (needs `PROCESSING_ENABLED=true`). `--outdated` also redoes jobs made with older reading rules; `--failed` retries ads whose processing failed |
 | `jobs:standardize [--all]` | Standardize jobs and rebuild their matching keys (only jobs made with older rules, or all with `--all`) |
 | `terms:install` | Add any missing starting words and places to the dictionary (never overwrites a correction you made) |
 | `jobs:sweep-status` | Re-check every job's status: expire past end dates, close ads a full-list source dropped, reopen ones that came back (scheduled daily at 04:00) |
@@ -102,6 +102,19 @@ In the app a source uses **Collection method = Python worker** and **Collector =
 ## Handing ads on for processing
 
 Every new or changed ad is stored as `pending` and raises a `RawJobPostStored` event. Set `PROCESSING_ENABLED=true` to switch the processing stage on: each ad then gets a background `ProcessRawJobPost` job, and `processing:dispatch` queues the ads that were waiting (run it once after switching on, to take in the ads already stored). Raw ad text is cleared 90 days after an ad is first seen whether or not it was processed; the dashboard warns when waiting ads are within 30 days of that.
+
+### Running it day to day (Phase 6, step 7)
+
+Each ad is one background job that does the whole chain: read the ad into a job, standardize it, build its matching keys, set its status, compare it with other jobs. Everything inside is one transaction, so a job never shows up half made; if any step fails the ad is marked `failed` with the reason and nothing is stored for it. (The `processing` status is therefore never seen: a job goes straight from being read to its real status.)
+
+| Situation | What to do |
+|---|---|
+| First switch-on, or ads stored while it was off | Set `PROCESSING_ENABLED=true`, then `php artisan processing:dispatch` once. The dashboard warns while ads wait and processing is off |
+| An ad failed (the dashboard says so) | Fix the cause if there is one, then `php artisan processing:dispatch --failed` |
+| The reading rules were improved (`ExtractionProcessor::VERSION` raised) | `php artisan processing:dispatch --outdated`. It redoes jobs in place (no new jobs, your decisions kept) and only where the ad text is still stored, because re-reading an ad whose text was cleared would lose what was read from it. For those, `php artisan jobs:standardize --all` redoes the standard values |
+| The standardizing rules or dictionary changed | `php artisan jobs:standardize --all` |
+
+Dates and sources move jobs on without any new ad: `jobs:sweep-status` runs daily at 04:00. The dashboard shows jobs by status, and what waits for a person: jobs to review, possible duplicates, and values to map.
 
 ### Reading an ad into a job (Phase 6, step 1)
 
@@ -177,3 +190,11 @@ If you turned two-factor on and lose your phone: use a recovery code at the code
 ## Tests
 
 `php artisan test`
+
+No test reaches a real website: `Tests\TestCase` forbids any request a test has not faked, and `NoRealNetworkTest` fails if that guard is ever removed. Tests use saved files in `tests/Fixtures` and faked HTTP.
+
+`Phase6EndToEndTest` is the acceptance test for the clean dataset. A synthetic Mining Engineer vacancy comes in through the real collectors (an RSS feed and a JSON and a CSV import), on the company's own site, on a board (same text, employer written differently) and, reworded, on a second board, together with look-alikes that must stay separate, a tender notice, an expired ad and an ad too thin to trust. It checks the whole result (one main job, standard values beside untouched originals, the right status for each, a person settling the open questions), that a second intake changes nothing, that processing never alters a stored ad, and that the dataset keeps what it learned after the raw text is cleared. `ChecksDataset` holds the rules the finished dataset must always obey (every job has one of the seven statuses with a reason and a history that ends where it is; copies point at one main job with no chains; standard values agree with each other).
+
+### A source that keeps no text
+
+Some sources are set not to keep ad text (`retain_raw` off, for example where the site's terms forbid it). For those no text fingerprint is made, and nothing text-derived is stored. Their ads can still be matched on employer, title, place and dates and are proposed for review, but they cannot reach the automatic line (an ad with no text scores at most 80) unless they share a specific application link. That is deliberate: merging on text would mean keeping the text.

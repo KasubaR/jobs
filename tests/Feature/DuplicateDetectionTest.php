@@ -351,6 +351,119 @@ class DuplicateDetectionTest extends TestCase
         $this->assertSame(1, Job::where('status', 'duplicate')->count());
     }
 
+    // ---- groups of copies ----
+
+    private function groupWithAReword(): array
+    {
+        $company = $this->ad($this->s['company']);
+        $copy = $this->ad($this->s['boardA']);                                                  // same text: merged automatically
+        $reword = $this->ad($this->s['boardB'], [], ['raw_content' => '<p>'.self::mineBody('drainage').'</p>']); // reworded: for a person
+
+        return [$company, $copy, $reword];
+    }
+
+    public function test_a_reworded_copy_of_a_group_is_proposed_once_not_once_per_member(): void
+    {
+        [$company, $copy, $reword] = $this->groupWithAReword();
+
+        $this->assertSame('duplicate', $copy->fresh()->status);
+        $this->assertSame(1, DB::table('job_duplicate_candidates')->where('outcome', 'possible')->count()); // one question for the group
+        $this->assertSame(2, DB::table('job_duplicate_candidates')->count());                                // plus the automatic pair
+        $this->assertSame('published', $reword->fresh()->status);
+    }
+
+    public function test_the_reworded_ad_arriving_first_still_leaves_one_question_for_the_group(): void
+    {
+        $reword = $this->ad($this->s['boardB'], [], ['raw_content' => '<p>'.self::mineBody('drainage').'</p>']);
+        $company = $this->ad($this->s['company']);   // a question: is the reworded ad the same?
+        $copy = $this->ad($this->s['boardA']);       // merges with the company ad, and is a second way to ask the same question
+
+        $this->assertSame('duplicate', $copy->fresh()->status);
+        $possible = DB::table('job_duplicate_candidates')->where('outcome', 'possible')->get();
+        $this->assertCount(1, $possible, 'the same question was kept twice, once through each member of the group');
+        $this->assertContains($reword->id, [$possible[0]->job_a_id, $possible[0]->job_b_id]);
+    }
+
+    public function test_confirming_one_pair_leaves_no_stale_question_about_the_same_group(): void
+    {
+        $reword = $this->ad($this->s['boardB'], [], ['raw_content' => '<p>'.self::mineBody('drainage').'</p>']);
+        $company = $this->ad($this->s['company']);
+        $copy = $this->ad($this->s['boardA']);
+        $pair = DB::table('job_duplicate_candidates')->where('outcome', 'possible')->first();
+
+        app(DuplicateDetector::class)->confirm($pair, $company->id);
+
+        $this->assertSame(0, DB::table('job_duplicate_candidates')->where('outcome', 'possible')->count());
+        $this->assertSame($company->id, $reword->fresh()->duplicate_of_job_id);
+        $this->assertSame($company->id, $copy->fresh()->duplicate_of_job_id); // still one level
+    }
+
+    public function test_one_question_per_group_also_when_the_company_ad_came_first(): void
+    {
+        $company = $this->ad($this->s['company']);
+        $reword = $this->ad($this->s['boardB'], [], ['raw_content' => '<p>'.self::mineBody('drainage').'</p>']); // a question about the company ad
+        $copy = $this->ad($this->s['boardA']);                                                                 // joins the company ad, asks it again
+
+        $this->assertSame('duplicate', $copy->fresh()->status);
+        $this->assertSame(1, DB::table('job_duplicate_candidates')->where('outcome', 'possible')->count());
+    }
+
+    public function test_confirming_a_pair_drops_other_questions_that_it_answers(): void
+    {
+        $company = $this->ad($this->s['company']);
+        $copy = $this->ad($this->s['boardA']);
+        $reword = $this->ad($this->s['boardB'], [], ['raw_content' => '<p>'.self::mineBody('drainage').'</p>']);
+        $first = DB::table('job_duplicate_candidates')->where('outcome', 'possible')->first();
+        $otherMember = in_array($company->id, [$first->job_a_id, $first->job_b_id], true) ? $copy->id : $company->id;
+        [$lo, $hi] = $otherMember < $reword->id ? [$otherMember, $reword->id] : [$reword->id, $otherMember];
+        DB::table('job_duplicate_candidates')->insert(['job_a_id' => $lo, 'job_b_id' => $hi, 'score' => 71, 'reason' => 'score', 'outcome' => 'possible', 'created_at' => now(), 'updated_at' => now()]); // the same question, asked through the other copy
+
+        app(DuplicateDetector::class)->confirm($first, $company->id);
+
+        $this->assertSame(0, DB::table('job_duplicate_candidates')->where('outcome', 'possible')->count());
+    }
+
+    public function test_a_question_about_two_ads_that_end_up_in_one_group_is_dropped(): void
+    {
+        $company = $this->ad($this->s['company']);
+        $first = $this->ad($this->s['boardA']);
+        // a question left over from before the two were joined (here made by hand)
+        DB::table('job_duplicate_candidates')->where('job_a_id', $company->id)->where('job_b_id', $first->id)->update(['outcome' => 'possible', 'score' => 75]);
+        $this->assertSame(1, DB::table('job_duplicate_candidates')->where('outcome', 'possible')->count());
+
+        $this->ad($this->s['boardB']); // joins the same group
+
+        $this->assertSame(0, DB::table('job_duplicate_candidates')->where('outcome', 'possible')->count());
+    }
+
+    public function test_choosing_a_copy_as_the_main_chooses_its_group(): void
+    {
+        [$company, $copy, $reword] = $this->groupWithAReword();
+        $pair = DB::table('job_duplicate_candidates')->where('outcome', 'possible')->first();
+        $copyIsInPair = in_array($copy->id, [$pair->job_a_id, $pair->job_b_id], true);
+
+        // whichever member was shown, naming the copy as main keeps the group's own main (the copy points at it)
+        app(DuplicateDetector::class)->confirm($pair, $copyIsInPair ? $copy->id : $company->id);
+
+        $this->assertNull($company->fresh()->duplicate_of_job_id);
+        $this->assertSame($company->id, $reword->fresh()->duplicate_of_job_id);
+    }
+
+    public function test_saying_different_is_said_about_the_whole_group(): void
+    {
+        [$company, $copy, $reword] = $this->groupWithAReword();
+        $pair = DB::table('job_duplicate_candidates')->where('outcome', 'possible')->first();
+
+        app(DuplicateDetector::class)->reject($pair);
+
+        // the reworded ad is "different" from the company ad and from its copy, so no other member brings the question back
+        $this->assertSame(0, DB::table('job_duplicate_candidates')->where('outcome', 'possible')->count());
+        $this->assertSame(2, DB::table('job_duplicate_candidates')->where('outcome', 'rejected')->count());
+        app(DuplicateDetector::class)->detect($reword->fresh());
+        $this->assertSame(0, DB::table('job_duplicate_candidates')->where('outcome', 'possible')->count());
+        $this->assertSame('published', $reword->fresh()->status);
+    }
+
     // ---- the scorer on its own ----
 
     public function test_the_scorer_reads_two_jobs_and_writes_nothing(): void

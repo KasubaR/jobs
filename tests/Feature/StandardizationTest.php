@@ -359,6 +359,16 @@ class StandardizationTest extends TestCase
         $this->assertGreaterThanOrEqual(20, MatchingKeys::distance($original, $other)); // unrelated text sits near 32
     }
 
+    public function test_boilerplate_in_the_same_paragraph_as_the_text_does_not_swallow_the_text(): void
+    {
+        [$plain] = MatchingKeys::fingerprint('<p>'.self::body().'</p>');
+        [$oneParagraph, $hash] = MatchingKeys::fingerprint('Closing date: 15 December 2026. '.self::body().' How to apply: send your CV to the HR office. Share this job.');
+
+        $this->assertNotNull($oneParagraph, 'the whole ad was dropped because it began with a closing date');
+        $this->assertSame($plain, $oneParagraph);
+        $this->assertSame(hash('sha256', implode(' ', MatchingKeys::words(self::body()))), $hash);
+    }
+
     public function test_a_text_too_short_to_say_anything_has_no_fingerprint(): void
     {
         $this->assertSame([null, null], MatchingKeys::fingerprint('Short ad. Apply now.'));

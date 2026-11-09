@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+  <title>Board A Jobs</title>
+  <link>https://board-a.test</link>
+  <item>
+    <title>Mining Engineer at Sample Mining Limited</title>
+    <link>https://board-a.test/jobs/mining-engineer/</link>
+    <pubDate>Mon, 02 Nov 2026 09:00:00 +0000</pubDate>
+    <guid isPermaLink="false">https://board-a.test/?p=2001</guid>
+    <description><![CDATA[<p>Mining engineer needed.</p>]]></description>
+    <content:encoded><![CDATA[<p>Closing date: 15 December 2026</p><p>Location: Solwezi City</p><p>Job type: Full time</p><p>Qualification: Bachelor of Science in Mining Engineering</p><p>Experience: five (5) years</p><p>The mining engineer will plan and supervise underground and open pit operations, manage blasting schedules, monitor ventilation and ground conditions, and prepare production reports for the mine manager. The successful candidate must hold a recognised engineering degree, understand safety regulations, lead shift teams and work closely with geologists and surveyors. Experience with mine planning software and cost control is an advantage for this position at the Solwezi operation.</p><p>Share this job on Facebook</p>]]></content:encoded>
+  </item>
+  <item>
+    <title>Cook at Beta Foods</title>
+    <link>https://board-a.test/jobs/cook/</link>
+    <pubDate>Tue, 03 Nov 2026 09:00:00 +0000</pubDate>
+    <guid isPermaLink="false">https://board-a.test/?p=2002</guid>
+    <description><![CDATA[<p>Cook needed.</p>]]></description>
+    <content:encoded><![CDATA[<p>Closing date: 20 December 2026</p><p>Location: Lusaka City</p><p>Job type: Permanent and pensionable</p><p>The cook prepares breakfast and lunch for sixty staff, orders groceries each week, keeps the kitchen clean and safe, follows hygiene rules and records the temperature of the cold room twice a day. Applicants must hold a food handling certificate and be able to work early shifts and some weekends.</p>]]></content:encoded>
+  </item>
+  <item>
+    <title>URGENT: Accounts Clerk</title>
+    <link>https://board-a.test/jobs/accounts-clerk/</link>
+    <pubDate>Wed, 04 Nov 2026 09:00:00 +0000</pubDate>
+    <guid isPermaLink="false">https://board-a.test/?p=2003</guid>
+    <description><![CDATA[<p>Apply now.</p>]]></description>
+    <content:encoded><![CDATA[<p>Apply now.</p>]]></content:encoded>
+  </item>
+</channel>
+</rss>
