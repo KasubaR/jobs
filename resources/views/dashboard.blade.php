@@ -33,7 +33,11 @@
     Raw ad text is cleared at that limit, so an ad that has not been processed by then keeps only its title, link and dates.</div>
 @endif
 @if ($processFailed > 0)
-  <div class="alert bad" role="alert">{{ number_format($processFailed) }} {{ Str::plural('ad', $processFailed) }} failed during processing.</div>
+  <div class="alert bad" role="alert">{{ number_format($processFailed) }} {{ Str::plural('ad', $processFailed) }} failed during processing. Run <code>php artisan processing:dispatch --failed</code> to try them again.</div>
+@endif
+@if ($processingOff)
+  <div class="alert warn" role="status"><b>Processing is switched off, so {{ number_format($waiting) }} {{ Str::plural('ad', $waiting) }} {{ $waiting === 1 ? 'is' : 'are' }} waiting and no jobs are being made.</b>
+    Set <code>PROCESSING_ENABLED=true</code> in the <code>.env</code> file, then run <code>php artisan processing:dispatch</code> once to take in the ads already stored.</div>
 @endif
 
 <section class="g4 st">
@@ -115,6 +119,35 @@
     @else
       <p class="empty">No sources registered yet.</p>
     @endif
+  </div>
+</section>
+
+<section class="split">
+  <div class="card">
+    @php
+        $jobsTotal = $jobStatus->sum();
+        $jobsMax = max(1, (int) $jobStatus->max());
+        $statusNames = ['published' => 'Published', 'new' => 'New (waiting for review)', 'expired' => 'Expired', 'closed' => 'Closed', 'duplicate' => 'Duplicate', 'rejected' => 'Rejected'];
+    @endphp
+    <div class="hd"><div><h3>Jobs by status</h3><p class="sub">{{ number_format($jobsTotal) }} {{ Str::plural('job', $jobsTotal) }} in the clean dataset, each vacancy counted once</p></div><a class="vl" href="{{ route('jobs.index') }}">View all &rsaquo;</a></div>
+    @if ($jobsTotal === 0)
+      <p class="empty">No jobs yet. They appear once processing is switched on and ads have been collected.</p>
+    @else
+      @foreach ($statusNames as $key => $label)
+        @php $n = (int) ($jobStatus[$key] ?? 0); @endphp
+        <div class="rm"><div class="h"><a class="name" href="{{ route('jobs.index', ['status' => $key]) }}">{{ $label }}</a><em>{{ number_format($n) }}</em></div>
+          <div class="bar"><i class="{{ $key === 'published' ? 'hi' : '' }}" style="width:{{ $n ? max(3, round($n / $jobsMax * 100)) : 0 }}%"></i></div></div>
+      @endforeach
+    @endif
+  </div>
+  <div class="card">
+    <div class="hd"><div><h3>Waiting for you</h3><p class="sub">Decisions only a person can make</p></div></div>
+    <div class="act"><div class="ic {{ $jobsToReview ? 'warn' : 'ok' }}"><svg class="i"><use href="#eye"/></svg></div>
+      <div><a class="name" href="{{ route('jobs.index', ['review' => 'needs_review']) }}"><b>{{ $jobsToReview }}</b> {{ Str::plural('job', $jobsToReview) }} to review</a><br><small>Too little could be read from the ad</small></div></div>
+    <div class="act"><div class="ic {{ $possibleDuplicates ? 'warn' : 'ok' }}"><svg class="i"><use href="#users"/></svg></div>
+      <div><a class="name" href="{{ route('duplicates.index') }}"><b>{{ $possibleDuplicates }}</b> possible {{ Str::plural('duplicate', $possibleDuplicates) }}</a><br><small>Same vacancy or not?</small></div></div>
+    <div class="act"><div class="ic {{ $valuesToMap ? 'warn' : 'ok' }}"><svg class="i"><use href="#bars"/></svg></div>
+      <div><a class="name" href="{{ route('values.index') }}"><b>{{ $valuesToMap }}</b> {{ Str::plural('value', $valuesToMap) }} to map</a><br><small>Text the rules could not standardize</small></div></div>
   </div>
 </section>
 

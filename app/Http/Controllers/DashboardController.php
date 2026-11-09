@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Job;
 use App\Models\RawJobPost;
 use App\Models\Source;
 use App\Models\SourceRun;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -60,6 +62,13 @@ class DashboardController extends Controller
                 ->whereNotNull('raw_content')
                 ->where('first_seen_at', '<', now()->subDays(max(1, (int) config('job_intel.raw_retention_days') - 30)))
                 ->count(),
+            // the clean dataset
+            'jobStatus' => Job::query()->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status'),
+            'jobsToReview' => Job::where('review_status', 'needs_review')->count(),
+            'possibleDuplicates' => DB::table('job_duplicate_candidates')->where('outcome', 'possible')->count(),
+            // one decision fixes every job waiting on the same text, so the same text counts once
+            'valuesToMap' => DB::query()->fromSub(DB::table('unrecognized_values')->select('kind', 'normalized')->groupBy('kind', 'normalized'), 'v')->count(),
+            'processingOff' => ! config('job_intel.processing_enabled') && RawJobPost::pending()->exists(),
             'accessCounts' => Source::selectRaw('access_status, count(*) as c')->groupBy('access_status')->pluck('c', 'access_status'),
             'days' => $days,
             'adsTrend' => $trend('ads'),
