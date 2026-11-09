@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DuplicateController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\DirectoryController;
+use App\Http\Controllers\EmployerController;
 use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RunController;
@@ -54,7 +55,10 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
     Route::post('/duplicates/{pair}/confirm', [DuplicateController::class, 'confirm'])->whereNumber('pair')->name('duplicates.confirm');
     Route::post('/duplicates/{pair}/reject', [DuplicateController::class, 'reject'])->whereNumber('pair')->name('duplicates.reject');
 
-    Route::get('/review', [ReviewController::class, 'index'])->name('review.index');
+    Route::get('/employers', [EmployerController::class, 'index'])->name('employers.index');
+    Route::put('/employers/{employer}', [EmployerController::class, 'update'])->whereNumber('employer')->name('employers.update');
+
+    Route::get('/review',[ReviewController::class, 'index'])->name('review.index');
     Route::post('/review', [ReviewController::class, 'store'])->name('review.store');
 
     Route::get('/values',[UnrecognizedValueController::class, 'index'])->name('values.index');
