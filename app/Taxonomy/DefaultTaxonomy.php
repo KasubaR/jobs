@@ -23,7 +23,12 @@ class DefaultTaxonomy
         $added = [];
 
         $insert = function (string $table, array $row) use (&$added) {
-            $added[$table] = ($added[$table] ?? 0) + DB::table($table)->insertOrIgnore($row);
+            $new = DB::table($table)->insertOrIgnore($row);
+            $added[$table] = ($added[$table] ?? 0) + $new;
+
+            if ($new === 0) {
+                $added[$table.' (aliases)'] = ($added[$table.' (aliases)'] ?? 0) + self::addMissingAliases($table, $row);
+            }
         };
 
         foreach (self::data('industries') as [$code, $name, $aliases]) {
@@ -71,6 +76,35 @@ class DefaultTaxonomy
         }
 
         return $added;
+    }
+
+    /** Natural key of each table that has aliases. */
+    private const KEYS = ['industries' => 'code', 'seniority_levels' => 'key', 'fields_of_study' => 'key', 'academic_awards' => 'key', 'professional_qualifications' => 'key',
+        'professional_registrations' => 'key', 'occupations' => 'code', 'skills' => 'name'];
+
+    /**
+     * An entry that already exists gains any alias the data file now lists and it lacks. Only aliases are added, never
+     * removed or reworded, and only to rows still marked 'seed': once a person has taken a row over it is theirs.
+     */
+    private static function addMissingAliases(string $table, array $row): int
+    {
+        $wanted = json_decode((string) ($row['aliases'] ?? ''), true) ?: [];
+        $key = self::KEYS[$table] ?? null;
+        $existing = $wanted && $key ? DB::table($table)->where($key, $row[$key])->where('origin', 'seed')->first() : null;
+        if (! $existing) {
+            return 0;
+        }
+
+        $have = json_decode((string) $existing->aliases, true) ?: [];
+        $known = array_map('mb_strtolower', $have);
+        $missing = array_values(array_filter($wanted, fn ($a) => ! in_array(mb_strtolower($a), $known, true)));
+        if (! $missing) {
+            return 0;
+        }
+
+        DB::table($table)->where('id', $existing->id)->update(['aliases' => json_encode(array_merge($have, $missing), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'updated_at' => now()]);
+
+        return count($missing);
     }
 
     private static function data(string $file): array

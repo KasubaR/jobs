@@ -148,7 +148,10 @@ class RequirementApplier
         $noEmployer = preg_replace('/\s+at\s+[^–—-]*$/iu', '', $title);
         $noBrackets = trim(preg_replace('/\s*[(\[].*?[)\]]/u', '', $noEmployer));
 
-        foreach ([$title, $noEmployer, $noBrackets, preg_split('/\s+[–—-]\s+/u', $noBrackets)[0]] as $candidate) {
+        $parts = preg_split('/\s+[–—-]\s+/u', $noBrackets);
+        $swapped = count($parts) === 2 ? $parts[1].' '.$parts[0] : $noBrackets;   // "Analyst – Budgeting" is a Budgeting Analyst
+
+        foreach ([$title, $noEmployer, $noBrackets, $swapped, $parts[0]] as $candidate) {
             if ($code = $this->taxonomy->occupation(trim($candidate))?->code) {
                 return $code;
             }

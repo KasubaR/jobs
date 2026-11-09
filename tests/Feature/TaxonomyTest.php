@@ -45,6 +45,30 @@ class TaxonomyTest extends TestCase
         $this->assertSame(0, DB::table('skills')->where('origin', '!=', 'seed')->count());
     }
 
+    public function test_installing_again_adds_an_alias_the_data_file_gained_to_a_row_still_marked_seed(): void
+    {
+        $aliases = fn () => json_decode(DB::table('occupations')->where('code', '3313')->value('aliases'), true);
+        DB::table('occupations')->where('code', '3313')->update(['aliases' => json_encode(['accounts assistant', 'my own title'])]);   // an older install, plus something a person added
+
+        $added = DefaultTaxonomy::install();
+
+        $this->assertContains('finance officer', $aliases());
+        $this->assertContains('my own title', $aliases(), 'nothing is removed');
+        $this->assertGreaterThan(0, $added['occupations (aliases)']);
+        $this->assertSame(0, DefaultTaxonomy::install()['occupations (aliases)'] ?? 0, 'and a second install adds nothing more');
+
+        DB::table('occupations')->where('code', '3313')->update(['aliases' => json_encode(['accounts assistant']), 'origin' => 'person']);
+        DefaultTaxonomy::install();
+        $this->assertSame(['accounts assistant'], $aliases(), 'a row a person has taken over is not touched');
+    }
+
+    public function test_titles_seen_in_real_ads_find_their_occupation(): void
+    {
+        foreach ([['Finance Officer', '3313'], ['Application Support Analyst', '3512'], ['Monitoring and Evaluation Expert', '2422'], ['Budgeting Analyst', '2413']] as [$title, $code]) {
+            $this->assertSame($code, $this->t()->occupation($title)?->code, $title);
+        }
+    }
+
     public function test_installing_again_adds_nothing_and_never_changes_an_existing_row(): void
     {
         DB::table('skills')->where('name', 'Microsoft Excel')->update(['aliases' => json_encode(['MS Excel', 'my own wording']), 'origin' => 'person']);
