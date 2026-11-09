@@ -21,7 +21,7 @@ use Throwable;
 class ExtractionProcessor implements RawPostProcessor
 {
     /** Raised when the reading rules improve, so older jobs can be found and reprocessed. */
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     public function __construct(
         private JobExtractor $extractor,

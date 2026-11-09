@@ -122,6 +122,18 @@ class JobExtractionTest extends TestCase
         $this->assertSame('rule', $job->field_sources['closing_date']);
     }
 
+    public function test_a_requirements_bullet_without_a_label_gives_the_qualification(): void
+    {
+        $post = $this->ad(['raw_content' => '<h3>Qualifications, Skills &amp; Experience</h3><ul>'
+            .'<li>Diploma or degree in Accounting, Finance, Business Administration, or related field.</li>'
+            .'<li>2+ years of experience in finance.</li></ul><p>Certificate holders are welcome to ask questions.</p>']);
+
+        $job = $this->run_($post);
+
+        $this->assertSame('Diploma or degree in Accounting, Finance, Business Administration, or related field.', $job->qualification_text);
+        $this->assertSame('rule', $job->field_sources['qualification_text']);
+    }
+
     public function test_a_deadline_without_a_year_is_not_guessed(): void
     {
         $post = $this->ad(['raw_content' => 'Please apply by 30 November. Closing date: end of the month.']);
