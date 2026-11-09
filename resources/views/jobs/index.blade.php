@@ -1,7 +1,7 @@
 @extends('layouts.app')
-@section('title', 'Jobs')
-@section('heading', 'Jobs')
-@section('subheading', 'The clean dataset: one record per vacancy, made from the ads collected')
+@section('title', 'Vacancies')
+@section('heading', 'Vacancies')
+@section('subheading', 'The ads behind the numbers: one record per vacancy, to check and correct')
 @section('content')
 <section class="card">
   <div class="hd">

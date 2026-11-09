@@ -14,11 +14,12 @@
 @php
     $nav = [
         ['dashboard', 'Dashboard', 'dash', 'dashboard'],
-        ['sources.index', 'Sources', 'globe', 'sources.*'],
-        ['jobs.index', 'Jobs', 'box', 'jobs.*'],
+        ['qualifications.index', 'Qualifications', 'bars', 'qualifications.*'],
+        ['jobs.index', 'Vacancies', 'box', 'jobs.*'],
         ['duplicates.index', 'Possible duplicates', 'users', 'duplicates.*'],
+        ['sources.index', 'Sources', 'globe', 'sources.*'],
         ['runs.index', 'Collection runs', 'clock', 'runs.*'],
-        ['values.index', 'Values to map', 'bars', 'values.*'],
+        ['values.index', 'Values to map', 'find', 'values.*'],
         ['security', 'Security', 'lock', 'security'],
     ];
     $initial = strtoupper(substr(auth()->user()->name ?: auth()->user()->email, 0, 1));
