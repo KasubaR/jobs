@@ -44,6 +44,7 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
     Route::get('/qualifications', [QualificationController::class, 'index'])->name('qualifications.index');
 
     Route::get('/insights', [InsightsController::class, 'index'])->name('insights.index');
+    Route::get('/insights/{dimension}', [InsightsController::class, 'group'])->whereIn('dimension', ['occupation', 'industry'])->name('insights.group');
 
     Route::get('/directory',[DirectoryController::class, 'index'])->name('directory.index');
     Route::get('/directory/{qualification}', [DirectoryController::class, 'show'])->whereNumber('qualification')->name('directory.show');

@@ -139,6 +139,86 @@ class AdvertisedDemand
         return ['degree_vacancies' => $degreeVacancies, 'with_professional' => $withProfessional, 'qualifications' => $rows];
     }
 
+    // ---- by group: an occupation or an industry ----
+
+    public const DIMENSIONS = ['occupation', 'industry'];
+
+    /**
+     * The occupations (at unit group or sub-major level) or industries that analysed vacancies fall in, largest first.
+     * A vacancy with no known occupation or industry is not in any group, and `known` says how many were placed.
+     *
+     * @param 'occupation'|'industry' $dimension
+     * @param 'unit'|'submajor' $level occupation detail: 4-digit unit groups, or the broader 2-digit sub-major groups
+     * @return array{groups: Collection<int, object{key:string, name:string, vacancies:int, reliable:bool}>, known:int, analysed:int}
+     */
+    public function groups(string $dimension, string $level = 'submajor'): array
+    {
+        [$key, $name] = $this->groupColumns($dimension);
+
+        $rows = $this->grouped($this->analysedQuery(), $dimension, $level)
+            ->selectRaw("{$key} as `key`, {$name} as name, count(distinct jobs.id) as vacancies")
+            ->groupBy(DB::raw($key), DB::raw($name))->orderByDesc('vacancies')->orderBy('name')->get()
+            ->map(function ($r) {
+                $r->reliable = $r->vacancies >= self::MIN_SAMPLE;
+
+                return $r;
+            });
+
+        return ['groups' => $rows, 'known' => (int) $rows->sum('vacancies'), 'analysed' => $this->analysedQuery()->count()];
+    }
+
+    /**
+     * What the vacancies in one group ask for, beside what all analysed vacancies ask for, so a qualification that is
+     * simply common everywhere is not mistaken for one that is special to the group.
+     *
+     * @return array{vacancies:int, reliable:bool, qualifications:Collection, levels:Collection}
+     */
+    public function qualificationsIn(string $dimension, string $key, string $level = 'submajor', int $limit = 12): array
+    {
+        $vacancies = fn () => $this->inGroup($this->analysedQuery(), $dimension, $level, $key);
+        $size = $vacancies()->distinct()->count('jobs.id');
+        $reliable = $size >= self::MIN_SAMPLE;
+        $overall = $this->qualificationsAsked(1000)->keyBy('id');
+
+        $rows = $this->asks($vacancies())->join('directory_qualifications as d', 'd.id', '=', 'jq.directory_qualification_id')
+            ->groupBy('d.id', 'd.name', 'd.kind')
+            ->selectRaw("d.id, d.name, d.kind, count(distinct jobs.id) as vacancies, count(distinct case when jq.requirement_level = 'required' then jobs.id end) as required")
+            ->orderByDesc('vacancies')->orderBy('d.name')->limit($limit)->get()
+            ->map(function ($r) use ($size, $reliable, $overall) {
+                $r = $this->withShare($r, max(1, $size));
+                $r->reliable = $r->reliable && $reliable;
+                $r->share = $r->reliable ? $r->share : null;
+                $r->overall_share = $overall[$r->id]->share ?? null;
+
+                return $r;
+            });
+
+        return ['vacancies' => $size, 'reliable' => $reliable, 'qualifications' => $rows, 'levels' => $reliable ? $this->levels($vacancies()) : collect()];
+    }
+
+    /** The key and name SQL of a group dimension. */
+    private function groupColumns(string $dimension): array
+    {
+        return $dimension === 'industry' ? ['cast(ind.id as char)', 'ind.name'] : ['occ.code', 'occ.title'];
+    }
+
+    /** Joins the group tables onto a vacancy query. */
+    private function grouped(Builder $query, string $dimension, string $level): Builder
+    {
+        if ($dimension === 'industry') {
+            return $query->leftJoin('employers as emp', 'emp.id', '=', 'jobs.employer_id')
+                ->join('industries as ind', 'ind.id', '=', DB::raw('coalesce(jobs.industry_id, emp.industry_id)'));
+        }
+
+        return $query->join('occupations as occ', 'occ.code', '=', $level === 'unit' ? 'jobs.occupation_code' : DB::raw('substr(jobs.occupation_code, 1, 2)'));
+    }
+
+    /** Only the vacancies in one group. */
+    private function inGroup(Builder $query, string $dimension, string $level, string $key): Builder
+    {
+        return $this->grouped($query, $dimension, $level)->where($dimension === 'industry' ? 'ind.id' : 'occ.code', $key);
+    }
+
     /** Analysed vacancies joined to the qualification items that count as "asked for". */
     private function asks(?Builder $vacancies = null): Builder
     {

@@ -12,6 +12,12 @@
 @include('partials.advertised-demand-note')
 
 <section class="card">
+  <div class="btns" style="margin-bottom:12px">
+    <a class="btn sm primary" href="{{ route('insights.index') }}">Overview</a>
+    <a class="btn sm" href="{{ route('insights.group', 'occupation') }}">By occupation</a>
+    <a class="btn sm" href="{{ route('insights.group', 'industry') }}">By industry</a>
+  </div>
+
   <form class="filters" method="GET" action="{{ route('insights.index') }}">
     <select name="scope" aria-label="Which vacancies">
       <option value="all" @selected($filters['scope'] === 'all')>All vacancies (open and closed)</option>

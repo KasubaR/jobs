@@ -29,7 +29,7 @@ class AdvertisedDemandTest extends TestCase
     {
         $this->n++;
 
-        return $this->ad($this->sourceSet()['company'], ['employer' => "Employer {$this->n} Ltd"], ['raw_title' => "{$title} {$this->n}", 'raw_content' => '<p>Requirements:<br>'.nl2br(e($requirements)).'</p>']);
+        return $this->ad($this->sourceSet()['company'], ['employer' => "Employer {$this->n} Ltd"], ['raw_title' => $title, 'raw_content' => '<p>Requirements:<br>'.nl2br(e($requirements)).'</p>']);
     }
 
     private function many(int $count, string $requirements, string $title = 'Accountant'): void
@@ -155,6 +155,70 @@ class AdvertisedDemandTest extends TestCase
         $this->assertSame(3, $pairs['with_professional']);
         $this->assertSame([5, 3], [$acca->vacancies, $acca->with_degree]);
         $this->assertSame(60.0, (float) $acca->share);
+    }
+
+    // ---- by occupation and by industry ----
+
+    public function test_qualifications_are_counted_within_an_occupation_beside_the_overall_share(): void
+    {
+        $this->many(5, 'ACCA is required.', 'Accountant');
+        $this->many(5, 'CIMA is required.', 'Security Officer');
+
+        $d = new AdvertisedDemand;
+        $groups = $d->groups('occupation');
+
+        $this->assertSame(['24' => 5, '54' => 5], $groups['groups']->pluck('vacancies', 'key')->all());
+        $this->assertSame(10, $groups['known']);
+
+        $in = $d->qualificationsIn('occupation', '24');
+        $acca = $in['qualifications']->firstWhere('name', 'ACCA');
+        $this->assertSame(5, $in['vacancies']);
+        $this->assertSame(100.0, (float) $acca->share, 'of the 5 vacancies in the group');
+        $this->assertSame(50.0, (float) $acca->overall_share, 'of all 10 read: so it is common here, not everywhere');
+        $this->assertNull($in['qualifications']->firstWhere('name', 'CIMA'), 'another occupation\'s qualification is not in this group');
+
+        $unit = $d->qualificationsIn('occupation', '2411', 'unit');
+        $this->assertSame(5, $unit['vacancies']);
+    }
+
+    public function test_a_small_group_shows_counts_but_no_shares(): void
+    {
+        $this->many(4, "ACCA is required.\nBachelor's Degree in Accounting.", 'Accountant');
+
+        $in = (new AdvertisedDemand)->qualificationsIn('occupation', '24');
+
+        $this->assertFalse($in['reliable']);
+        $this->assertSame(4, $in['qualifications']->firstWhere('name', 'ACCA')->vacancies);
+        $this->assertNull($in['qualifications']->firstWhere('name', 'ACCA')->share);
+        $this->assertTrue($in['levels']->isEmpty());
+    }
+
+    public function test_industry_comes_from_the_employer_and_vacancies_without_one_are_not_in_a_group(): void
+    {
+        $this->many(6, 'ACCA is required.', 'Accountant');
+        $finance = (int) DB::table('industries')->where('code', 'K')->value('id');
+        DB::table('employers')->whereIn('id', Job::orderBy('id')->take(5)->pluck('employer_id'))->update(['industry_id' => $finance]);
+
+        $d = new AdvertisedDemand;
+        $groups = $d->groups('industry');
+
+        $this->assertSame(5, $groups['known']);
+        $this->assertSame(6, $groups['analysed']);
+        $this->assertSame([(string) $finance => 5], $groups['groups']->pluck('vacancies', 'key')->all());
+        $this->assertSame(5, $d->qualificationsIn('industry', (string) $finance)['qualifications']->firstWhere('name', 'ACCA')->vacancies);
+    }
+
+    public function test_the_group_page_lists_groups_shows_a_selection_and_refuses_unknown_dimensions(): void
+    {
+        $this->signIn();
+        $this->many(5, 'ACCA is required.', 'Accountant');
+
+        $this->get(route('insights.group', 'occupation'))->assertOk()->assertSee('Choose an occupation')->assertSee('known for 5 of 5 vacancies read', false);
+        $this->get(route('insights.group', ['dimension' => 'occupation', 'group' => '24']))->assertOk()->assertSee('ACCA')->assertSee('overall 100%', false)
+            ->assertSee('not the Zambian labour market', false);
+        $this->get(route('insights.group', 'industry'))->assertOk()->assertSee('No vacancy has a known industry yet');
+        $this->get('/insights/colours')->assertNotFound();
+        $this->get(route('insights.group', ['dimension' => 'occupation', 'level' => 'nonsense']))->assertSessionHasErrors('level');
     }
 
     // ---- the page ----
