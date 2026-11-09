@@ -7,6 +7,7 @@ use App\Http\Controllers\DuplicateController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\DirectoryController;
 use App\Http\Controllers\EmployerController;
+use App\Http\Controllers\InsightsController;
 use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RunController;
@@ -42,7 +43,9 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
 
     Route::get('/qualifications', [QualificationController::class, 'index'])->name('qualifications.index');
 
-    Route::get('/directory', [DirectoryController::class, 'index'])->name('directory.index');
+    Route::get('/insights', [InsightsController::class, 'index'])->name('insights.index');
+
+    Route::get('/directory',[DirectoryController::class, 'index'])->name('directory.index');
     Route::get('/directory/{qualification}', [DirectoryController::class, 'show'])->whereNumber('qualification')->name('directory.show');
 
     Route::get('/jobs', [JobController::class, 'index'])->name('jobs.index');

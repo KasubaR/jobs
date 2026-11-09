@@ -14,6 +14,7 @@
 @php
     $nav = [
         ['dashboard', 'Dashboard', 'dash', 'dashboard'],
+        ['insights.index', 'Insights', 'bars', 'insights.*'],
         ['qualifications.index', 'Qualifications', 'bars', 'qualifications.*'],
         ['directory.index', 'Directory', 'box', 'directory.*'],
         ['jobs.index', 'Vacancies', 'box', 'jobs.*'],
