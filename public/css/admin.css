@@ -176,7 +176,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px}
 .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:16px;flex-wrap:wrap}
 .tabs a{padding:9px 14px;text-decoration:none;color:var(--mut);font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabs a.on{color:var(--blue);border-color:var(--blue)}
-dl.kv{display:grid;grid-template-columns:200px 1fr;gap:10px 16px;margin:0}
+dl.kv{font-size:14px;line-height:1.5;letter-spacing:0;font-weight:400;display:grid;grid-template-columns:200px 1fr;gap:10px 16px;margin:0}
 dl.kv dt{color:var(--mut)}dl.kv dd{margin:0;overflow-wrap:anywhere}
 
 /* forms */
@@ -261,7 +261,7 @@ aside{position:fixed;z-index:30;width:260px;left:-280px;transition:left .25s;top
 aside.open{left:0}
 .brand button,.menu{display:block}
 .search{display:none}
-header.top{padding:12px 16px}header.top h1{font-size:22px}header.top p{font-size:13px}.kv{font-size:28px}
+header.top{padding:12px 16px}header.top h1{font-size:22px}header.top p{font-size:13px}.kv{font-size:28px}dl.kv{font-size:14px}
 main{padding:18px 16px 40px}
 .banner{padding:20px}.banner h2{font-size:24px}.date{display:inline-block;margin:8px 0 0}
 .mini{grid-template-columns:1fr 1fr}
