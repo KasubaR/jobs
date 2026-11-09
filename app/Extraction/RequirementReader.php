@@ -193,11 +193,11 @@ class RequirementReader
             if ($p['status'] === 'ambiguous') {
                 $state->review = true;
                 $this->addQualification($state, $base + [
-                    'education_level' => null, 'field_id' => null, 'candidate_text' => mb_substr($clause, 0, 255),
+                    'education_level' => null, 'field_id' => null, 'candidate_text' => mb_substr($clause, 0, 255), 'original_text' => mb_substr(trim($clause), 0, 120),
                     'requirement_level' => $level, 'alternative_group' => null, 'confidence' => $this->score(35, $source),
                 ]);
             } elseif ($p['status'] === 'ok' && ($p['level'] ?? null) !== 'professional') {
-                $parsed[] = $p;
+                $parsed[] = $p + ['clause' => $clause];
             }
         }
 
@@ -219,11 +219,12 @@ class RequirementReader
             $certain = $p['level'] !== 'degree';
             $fields = $fieldText === null ? [] : $this->fieldsIn($fieldText);
             $fieldGroup = count($fields) > 1 ? ++$state->group : null;
+            $phrase = $this->levelPhrase($p['clause'], $p['field'] ?? null);
 
             if ($fieldText !== null && $fields === []) {
                 $state->review = true; // a field the taxonomy does not know: kept as wording, not forced onto an entry
                 $this->addQualification($state, $base + [
-                    'education_level' => $educationLevel, 'field_id' => null, 'candidate_text' => mb_substr($fieldText, 0, 255),
+                    'education_level' => $educationLevel, 'field_id' => null, 'candidate_text' => mb_substr($fieldText, 0, 255), 'original_text' => $phrase,
                     'requirement_level' => $level, 'alternative_group' => $clauseGroup, 'confidence' => $this->score(50, $source),
                 ]);
 
@@ -240,7 +241,7 @@ class RequirementReader
                 }
 
                 $this->addQualification($state, $base + [
-                    'education_level' => $educationLevel, 'field_id' => $field?->id, 'candidate_text' => null,
+                    'education_level' => $educationLevel, 'field_id' => $field?->id, 'candidate_text' => null, 'original_text' => $phrase,
                     'requirement_level' => $level, 'alternative_group' => $fieldGroup ?? $clauseGroup,
                     'confidence' => $this->score(($field ? 75 : ($certain ? 70 : 60)) - ($weak ? 10 : 0) - ($certain ? 0 : 5), $source),
                 ]);
@@ -256,11 +257,55 @@ class RequirementReader
                 $this->addQualification($state, $base + [
                     'named_kind' => $kind, 'named_key' => $entry->key, $column => $entry->id,
                     'education_level' => $kind === 'award' ? $entry->level : null, 'field_id' => $fieldId,
-                    'candidate_text' => null, 'requirement_level' => $level, 'alternative_group' => $fieldGroup,
+                    'candidate_text' => null, 'original_text' => $this->namedPhrase($entry, $s), 'requirement_level' => $level, 'alternative_group' => $fieldGroup,
                     'confidence' => $this->score($weak ? 75 : 85, $source),
                 ]);
             }
         }
+    }
+
+    /**
+     * The words the employer used for a named credential ("B.Eng", "ACCA"), as written. This short phrase is kept for
+     * good; the sentence around it goes with the raw ad text. When the written form cannot be found (the matcher ignores
+     * punctuation and case) the start of the sentence stands in, never more than 120 characters.
+     */
+    private function namedPhrase(object $entry, string $sentence): ?string
+    {
+        $best = null;
+        foreach (array_merge([$entry->label], $entry->aliases) as $wording) {
+            $wording = ltrim((string) $wording, '=');
+            if (mb_strlen($wording) < 2) {
+                continue;
+            }
+            if (preg_match('/(?<![\p{L}\p{N}])'.preg_quote($wording, '/').'(?![\p{L}\p{N}])/iu', $sentence, $m) && ($best === null || mb_strlen($m[0]) > mb_strlen($best))) {
+                $best = $m[0];
+            }
+        }
+
+        return mb_substr($best ?? trim($sentence), 0, 120);
+    }
+
+    /** "Degree in Accounting" out of "Candidates must hold a Degree in Accounting and 3 years...": from the level word to the end of the field. */
+    private function levelPhrase(string $clause, ?string $fieldText): ?string
+    {
+        if (! preg_match('/\b(?:first\s+degree|bachelor(?:\'?s|s)?|degree|diploma|certificate|master(?:\'?s|s)?|msc|mba|phd|doctorate|b\.?sc\.?|grade\s*(?:12|twelve))\b/iu', $clause, $m, PREG_OFFSET_CAPTURE)) {
+            return mb_substr(trim($clause), 0, 120) ?: null;
+        }
+
+        $start = $m[0][1];
+        $pos = $fieldText !== null && $fieldText !== '' ? stripos($clause, $fieldText, $start) : false;
+        if ($pos !== false) {
+            $end = $pos + strlen($fieldText);
+        } else {
+            $after = $start + strlen($m[0][0]);
+            $end = $after + (preg_match('/[.;(
+]/', substr($clause, $after), $cut, PREG_OFFSET_CAPTURE) ? $cut[0][1] : strlen($clause) - $after);
+        }
+
+        $phrase = substr($clause, $start, $end - $start);
+        $phrase = preg_split('/\s+(?:and|with|plus|but)\s+(?:have|having|at\s+least|\d|minimum|a\s+minimum|preferably|proven|good|strong)\b/iu', $phrase)[0];   // "... Accounting and have 3 years"
+
+        return mb_substr(trim($phrase, " 	,.;:-"), 0, 120) ?: null;
     }
 
     /** "Bachelor of Engineering" is already the named award BEng; do not also record it as "bachelor, engineering". Returns that award. */

@@ -41,6 +41,7 @@ class RequirementApplier
                 'directory_qualification_id' => $this->directoryId($r),
                 'field_id' => $r['field_id'] ?? null,
                 'candidate_text' => $r['candidate_text'] ?? null,
+                'original_text' => $r['original_text'] ?? null,
             ], $offset);
             $this->replace('job_skills', $job, $read['skills'], fn ($r) => (string) $r->skill_id, fn ($r) => ['skill_id' => $r['skill_id']], $offset);
             $this->replace('job_experiences', $job, $read['experiences'], fn ($r) => $r->min_years.'|'.($r->max_years ?? '').'|'.mb_strtolower((string) $r->area),

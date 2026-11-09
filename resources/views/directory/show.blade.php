@@ -16,7 +16,7 @@
     <p class="sub">Four separate facts follow: it exists, it is recognised, it can be studied, employers ask for it. An advertisement only shows the last one.</p></div>
     <span class="pill {{ $q->status === 'verified' ? '' : 'mut' }}">{{ ucfirst($q->status) }}</span></div>
   <dl class="kv">
-    <dt>Awarded by</dt><dd>{{ $q->awardingOrganization?->name ?? 'Not recorded' }}</dd>
+    <dt>Awarded by</dt><dd>{{ $q->awardingOrganization?->name ?? 'Not recorded' }}@if ($q->awardingOrganization && count($q->awardingOrganization->roleNames()) > 1) <small>({{ collect($q->awardingOrganization->roleNames())->map(fn ($x) => str_replace('_', ' ', $x))->implode(', ') }})</small>@endif</dd>
     <dt>Typical duration</dt><dd>{{ $q->typical_duration_months ? $q->typical_duration_months.' months' : 'Not verified' }}</dd>
     <dt>Entry requirements</dt><dd>{{ $q->entry_requirements ?: 'Not verified' }}</dd>
     @if ($q->aliases)<dt>Also written as</dt><dd>{{ implode(', ', $q->aliases) }}</dd>@endif
@@ -30,7 +30,7 @@
   <div class="card">
     <div class="hd"><div><h3>Recognition in Zambia</h3><p class="sub">What an authority says, with its source</p></div></div>
     @forelse ($recognitions as $r)
-      <div class="rm"><div class="h"><b>{{ $r->authority->name }}</b><span class="pill {{ $statusClass[$r->status] ?? 'mut' }}">{{ ucfirst(str_replace('_', ' ', $r->status)) }}</span></div>
+      <div class="rm"><div class="h"><b>{{ $r->authority->name }}</b>@if ($r->authority->roles->isNotEmpty()) <small>{{ $r->authority->roles->pluck('role')->map(fn ($x) => str_replace('_', ' ', $x))->implode(', ') }}</small>@endif<span class="pill {{ $statusClass[$r->status] ?? 'mut' }}">{{ ucfirst(str_replace('_', ' ', $r->status)) }}</span></div>
         <small>{{ $r->scope }}@if ($r->reference) · Ref. {{ $r->reference }}@endif @if ($r->valid_to) · valid to {{ $r->valid_to->format('j M Y') }}@endif
           · {{ $r->verified_at ? 'verified '.$r->verified_at->format('j M Y') : 'not verified' }}</small></div>
     @empty
@@ -105,7 +105,10 @@
 <section class="card">
   <div class="hd"><div><h3>Related qualifications</h3></div></div>
   @foreach ($relations as $rel)
-    <p style="margin:4px 0">{{ ucfirst($rel->type) }}{{ $rel->from_id === $q->id ? ' to ' : ' from ' }}<a href="{{ route('directory.show', $rel->other_id) }}">{{ $rel->other_name }}</a>@if ($rel->note) <small>· {{ $rel->note }}</small>@endif</p>
+    <p style="margin:4px 0">{{ ucfirst($rel->type) }}{{ $rel->from_id === $q->id ? ' to ' : ' from ' }}<a href="{{ route('directory.show', $rel->other_id) }}">{{ $rel->other_name }}</a>
+      @if ($rel->basis === 'official')<span class="pill">Official determination{{ $rel->verified_at ? ', verified '.\Illuminate\Support\Carbon::parse($rel->verified_at)->format('j M Y') : '' }}</span>
+      @else<span class="pill mut">Unverified comparison</span>@endif
+      @if ($rel->note)<small>· {{ $rel->note }}</small>@endif</p>
   @endforeach
 </section>
 @endif
@@ -121,4 +124,15 @@
     <p class="empty">No source is recorded for any fact on this page.</p>
   @endforelse
 </section>
+@if ($history->isNotEmpty())
+<section class="card">
+  <div class="hd"><div><h3>Change history</h3><p class="sub">The latest changes to this qualification and its records</p></div></div>
+  @foreach ($history as $h)
+    <p style="margin:4px 0"><small>{{ \Illuminate\Support\Carbon::parse($h->created_at)->format('j M Y H:i') }} · {{ $h->actor ?? 'unknown' }} · {{ str_replace('_', ' ', $h->via) }}</small><br>
+      {{ str_replace('_', ' ', $h->table_name) }} #{{ $h->row_id }}:
+      @if ($h->action === 'created') <b>created</b> with {{ \Illuminate\Support\Str::limit(collect(json_decode((string) $h->new_value, true) ?: [])->map(fn ($v, $k) => str_replace('_', ' ', $k).' '.$v)->implode(', '), 160) }}
+      @else <b>{{ $h->field }}</b> changed from “{{ \Illuminate\Support\Str::limit((string) $h->old_value, 60) }}” to “{{ \Illuminate\Support\Str::limit((string) $h->new_value, 60) }}”@endif</p>
+  @endforeach
+</section>
+@endif
 @endsection

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Processing\RequirementApplier;
+use App\Support\ChangeLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -53,13 +54,13 @@ class ReviewController extends Controller
 
         DB::transaction(function () use ($d, $ids, $applier) {
             if ($d['action'] === 'remove') {
-                DB::table('job_qualifications')->whereIn('id', $ids)->update(['removed' => true, 'reviewed' => true]);
+                $this->change($ids, ['removed' => true, 'reviewed' => true]);
 
                 return;
             }
 
             if ($d['action'] === 'keep') {
-                DB::table('job_qualifications')->whereIn('id', $ids)->update(['reviewed' => true]);
+                $this->change($ids, ['reviewed' => true]);
 
                 return;
             }
@@ -70,8 +71,8 @@ class ReviewController extends Controller
 
             $this->teachField((int) $d['field_id'], $d['wording']);
 
-            DB::table('job_qualifications')->whereIn('id', $ids)->update([
-                'field_id' => $d['field_id'], 'candidate_text' => null, 'directory_qualification_id' => $entry,
+            $this->change($ids, [
+                'field_id' => (int) $d['field_id'], 'candidate_text' => null, 'directory_qualification_id' => $entry,
                 'source' => 'person', 'reviewed' => true, 'confidence' => 100,
             ]);
         });
@@ -86,6 +87,16 @@ class ReviewController extends Controller
         $n = $jobIds->count();
 
         return redirect()->route('review.index')->with('status', "Saved for {$n} ".($n === 1 ? 'vacancy' : 'vacancies').'. '.($d['action'] === 'map' ? 'The same wording is understood from now on.' : ''));
+    }
+
+    /** Updates the rows and writes down what changed in each. */
+    private function change($ids, array $after): void
+    {
+        foreach (DB::table('job_qualifications')->whereIn('id', $ids)->get() as $row) {
+            ChangeLog::diff('job_qualifications', (int) $row->id, $row, $after, 'review_screen');
+        }
+
+        DB::table('job_qualifications')->whereIn('id', $ids)->update($after);
     }
 
     /** Qualification items nobody has decided on that carry wording we could not place, on vacancies that count. */
@@ -103,8 +114,10 @@ class ReviewController extends Controller
         $known = array_map('mb_strtolower', $aliases);
 
         if (! in_array(mb_strtolower($wording), $known, true)) {
+            $old = $aliases;
             $aliases[] = $wording;
             DB::table('fields_of_study')->where('id', $fieldId)->update(['aliases' => json_encode($aliases, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'updated_at' => now()]);
+            ChangeLog::record('fields_of_study', $fieldId, 'aliases', $old, $aliases, 'review_screen');
             app(\App\Taxonomy\TaxonomyIndex::class)->flush();   // a worker that is already running must see the new alias
         }
     }

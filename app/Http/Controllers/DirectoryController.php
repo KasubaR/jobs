@@ -37,16 +37,16 @@ class DirectoryController extends Controller
     public function show(DirectoryQualification $qualification): View
     {
         $id = $qualification->id;
-        $qualification->load(['level', 'awardingOrganization']);
+        $qualification->load(['level', 'awardingOrganization.roles']);
 
-        $recognitions = $qualification->recognitions()->with(['authority', 'evidence'])->get();
+        $recognitions = $qualification->recognitions()->with(['authority.roles', 'evidence'])->get();
         $programmes = $qualification->programmes()->with('provider')->get();
         $locations = DB::table('locations')->whereIn('id', $programmes->pluck('location_id')->filter())->pluck('name', 'id');
 
         $relations = DB::table('qualification_relationships as r')
             ->join('directory_qualifications as o', 'o.id', '=', DB::raw('case when r.from_id = '.(int) $id.' then r.to_id else r.from_id end'))
             ->where(fn ($q) => $q->where('r.from_id', $id)->orWhere('r.to_id', $id))
-            ->get(['r.type', 'r.note', 'r.from_id', 'o.id as other_id', 'o.name as other_name']);
+            ->get(['r.id', 'r.type', 'r.basis', 'r.note', 'r.verified_at', 'r.from_id', 'o.id as other_id', 'o.name as other_name']);
 
         return view('directory.show', [
             'q' => $qualification,
@@ -55,7 +55,8 @@ class DirectoryController extends Controller
             'programmes' => $programmes,
             'locations' => $locations,
             'relations' => $relations,
-            'evidence' => $this->evidence($qualification, $recognitions, $programmes),
+            'evidence' => $this->evidence($qualification, $recognitions, $programmes, $relations->pluck('id')),
+            'history' => $this->history($qualification, $recognitions, $programmes, $relations->pluck('id')),
             'demand' => $this->demand($id),
             'family' => $this->family($qualification),
             'links' => $this->links($id),
@@ -65,11 +66,11 @@ class DirectoryController extends Controller
     }
 
     /** Every source behind this page's facts, newest first. */
-    private function evidence(DirectoryQualification $q, $recognitions, $programmes)
+    private function evidence(DirectoryQualification $q, $recognitions, $programmes, $relationIds)
     {
-        return DB::table('evidence')->where(function ($w) use ($q, $recognitions, $programmes) {
+        return DB::table('evidence')->where(function ($w) use ($q, $recognitions, $programmes, $relationIds) {
             $w->where(fn ($x) => $x->where('subject_type', DirectoryQualification::class)->where('subject_id', $q->id));
-            foreach ([[\App\Models\Recognition::class, $recognitions], [\App\Models\Programme::class, $programmes]] as [$type, $rows]) {
+            foreach ([[\App\Models\Recognition::class, $recognitions], [\App\Models\Programme::class, $programmes], [\App\Models\QualificationRelationship::class, $relationIds->map(fn ($id) => (object) ['id' => $id])]] as [$type, $rows]) {
                 if ($rows->isNotEmpty()) {
                     $w->orWhere(fn ($x) => $x->where('subject_type', $type)->whereIn('subject_id', $rows->pluck('id')));
                 }
@@ -114,6 +115,20 @@ class DirectoryController extends Controller
             'members' => $entries->where('id', '!=', $q->id)->map(fn ($e) => (object) ['id' => $e->id, 'name' => $e->name, 'vacancies' => (int) ($perEntry[$e->id] ?? 0)])->sortByDesc('vacancies')->values(),
             'vacancies' => $together,
         ];
+    }
+
+    /** What was changed, by whom and through which door, for this qualification and the records hanging off it. */
+    private function history(DirectoryQualification $q, $recognitions, $programmes, $relationIds)
+    {
+        $subjects = ['directory_qualifications' => collect([$q->id]), 'recognitions' => $recognitions->pluck('id'), 'programmes' => $programmes->pluck('id'), 'qualification_relationships' => $relationIds];
+
+        return DB::table('data_change_logs')->where(function ($w) use ($subjects) {
+            foreach ($subjects as $table => $ids) {
+                if ($ids->isNotEmpty()) {
+                    $w->orWhere(fn ($x) => $x->where('table_name', $table)->whereIn('row_id', $ids));
+                }
+            }
+        })->orderByDesc('id')->limit(15)->get();
     }
 
     /** Vacancies asking for it, counted once each (copies and rejected ads left out; required or preferred only). */

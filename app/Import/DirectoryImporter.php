@@ -3,16 +3,18 @@
 namespace App\Import;
 
 use Illuminate\Support\Facades\DB;
+use App\Support\ChangeLog;
 use InvalidArgumentException;
 use Throwable;
 
 /**
  * Loads qualification-directory records from a CSV file, one record type per file.
  *
- *   organizations   key, name, type, country, website, aliases
+ *   organizations   key, name, type, country, website, aliases   (type may list several roles: university|awarding_body)
  *   qualifications  key, name, kind, level, field, awarding_organization, duration_months, entry_requirements, aliases
  *   recognitions    qualification, authority, status, scope, reference, valid_from, valid_to
  *   programmes      qualification, provider, name, mode, duration_months, location, accreditation_status, url
+ *   relationships   from, to, type, basis, note   (basis official needs a source AND a verified_on date; otherwise it is an unverified comparison)
  *
  * Qualifications, authorities and providers are named by their `key`. `level` is a qualification level key, `field` a
  * field-of-study key, `aliases` are separated by "|".
@@ -27,11 +29,12 @@ use Throwable;
  */
 class DirectoryImporter
 {
-    public const TYPES = ['organizations', 'qualifications', 'recognitions', 'programmes'];
+    public const TYPES = ['organizations', 'qualifications', 'recognitions', 'programmes', 'relationships'];
 
     private const ORG_TYPES = ['awarding_body', 'professional_body', 'university', 'college', 'regulator', 'exam_board'];
     private const KINDS = ['academic', 'professional', 'registration', 'vocational', 'short_course'];
     private const RECOGNITION = ['accredited', 'registered', 'recognised', 'not_recognised', 'unknown'];
+    private const REL_TYPES = ['progression', 'equivalent', 'prerequisite', 'exemption', 'related'];
     private const MODES = ['full_time', 'part_time', 'distance', 'online', 'blended'];
 
     /** Columns a file may leave out. */
@@ -39,6 +42,7 @@ class DirectoryImporter
         'organizations' => ['country', 'website', 'aliases'],
         'qualifications' => ['level', 'field', 'awarding_organization', 'duration_months', 'entry_requirements', 'aliases', 'source_url', 'source_document', 'note', 'verified_on', 'verified_by'],
         'recognitions' => ['scope', 'reference', 'valid_from', 'valid_to', 'source_url', 'source_document', 'note', 'verified_on', 'verified_by'],
+        'relationships' => ['basis', 'note', 'source_url', 'source_document', 'verified_on', 'verified_by'],
         'programmes' => ['name', 'mode', 'duration_months', 'location', 'accreditation_status', 'url', 'source_url', 'source_document', 'note', 'verified_on', 'verified_by'],
     ];
 
@@ -73,12 +77,25 @@ class DirectoryImporter
     private function organizations(array $r): string
     {
         $this->need($r, ['key', 'name', 'type']);
-        $this->oneOf($r['type'], self::ORG_TYPES, 'type');
+        $roles = array_values(array_unique(array_filter(array_map('trim', explode('|', $r['type'])))));
+        foreach ($roles as $role) {
+            $this->oneOf($role, self::ORG_TYPES, 'type');
+        }
 
-        return $this->upsert('organizations', ['key' => $r['key']], $this->present([
-            'name' => $r['name'], 'type' => $r['type'], 'country' => strtoupper($r['country'] ?: 'ZM'),
+        // the first role is the primary one; roles are only ever added by an import, never taken away
+        $outcome = $this->upsert('organizations', ['key' => $r['key']], $this->present([
+            'name' => $r['name'], 'type' => $roles[0], 'country' => strtoupper($r['country'] ?: 'ZM'),
             'website' => $this->url($r['website'] ?? ''), 'aliases' => $this->aliases($r['aliases'] ?? ''), 'origin' => 'person',
         ], ['country' => 'country', 'website' => 'website', 'aliases' => 'aliases']));
+
+        $id = DB::table('organizations')->where('key', $r['key'])->value('id');
+        foreach ($roles as $role) {
+            if (DB::table('organization_roles')->insertOrIgnore(['organization_id' => $id, 'role' => $role, 'created_at' => now(), 'updated_at' => now()])) {
+                ChangeLog::record('organizations', $id, 'role', null, $role, 'csv_import');
+            }
+        }
+
+        return $outcome;
     }
 
     private function qualifications(array $r): string
@@ -121,6 +138,37 @@ class DirectoryImporter
         ], ['scope' => 'scope', 'reference' => 'reference', 'valid_from' => 'valid_from', 'valid_to' => 'valid_to']) + ($source && $source['verified_at'] ? ['verified_at' => $source['verified_at']] : []));
         $id = DB::table('recognitions')->where('qualification_id', $qualification)->where('authority_id', $authority)->value('id');
         $this->attach($id, \App\Models\Recognition::class, 'recognition', $source);
+
+        return $outcome;
+    }
+
+    private function relationships(array $r): string
+    {
+        $this->need($r, ['from', 'to', 'type']);
+        $this->oneOf($r['type'], self::REL_TYPES, 'type');
+        $basis = $r['basis'] === '' ? 'comparison' : $r['basis'];
+        $this->oneOf($basis, \App\Models\QualificationRelationship::BASES, 'basis');
+
+        $from = $this->idOf('directory_qualifications', 'key', $r['from'], 'from');
+        $to = $this->idOf('directory_qualifications', 'key', $r['to'], 'to');
+        if ($from === $to) {
+            throw new InvalidArgumentException('a qualification cannot be related to itself');
+        }
+
+        // "equivalent" and every other official link is a claim: it needs a source and the date someone checked it
+        $source = $this->sourceOf($r);
+        if ($basis === 'official' && ! ($source && $source['verified_at'])) {
+            throw new InvalidArgumentException('an official determination needs a source (source_url or source_document) and a verified_on date; without them it is only a comparison');
+        }
+
+        $values = $this->present(['basis' => $basis, 'note' => $r['note'] ?: null], ['basis' => 'basis', 'note' => 'note']);
+        if (! in_array('basis', $this->absent, true)) {
+            $values['verified_at'] = $basis === 'official' ? $source['verified_at'] : null;
+        }
+
+        $outcome = $this->upsert('qualification_relationships', ['from_id' => $from, 'to_id' => $to, 'type' => $r['type']], $values);
+        $id = DB::table('qualification_relationships')->where('from_id', $from)->where('to_id', $to)->where('type', $r['type'])->value('id');
+        $this->attach($id, \App\Models\QualificationRelationship::class, 'relationship', $source);
 
         return $outcome;
     }
@@ -198,13 +246,15 @@ class DirectoryImporter
     private function upsert(string $table, array $match, array $values): string
     {
         $query = DB::table($table)->where($this->nullSafe($match));
-        if ($query->exists()) {
+        if ($before = $query->first()) {
             $query->update($values + ['updated_at' => now()]);
+            ChangeLog::diff($table, (int) $before->id, $before, $values, 'csv_import');
 
             return 'updated';
         }
 
-        DB::table($table)->insert($match + $values + ['created_at' => now(), 'updated_at' => now()]);
+        $id = DB::table($table)->insertGetId($match + $values + ['created_at' => now(), 'updated_at' => now()]);
+        ChangeLog::diff($table, $id, null, $match + $values, 'csv_import');
 
         return 'created';
     }

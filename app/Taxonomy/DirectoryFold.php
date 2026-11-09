@@ -3,6 +3,7 @@
 namespace App\Taxonomy;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -44,8 +45,15 @@ class DirectoryFold
             }
             $key = Str::limit(Str::slug($name), 80, '');
             $added['organizations'] += DB::table('organizations')->insertOrIgnore(['key' => $key, 'name' => $name, 'type' => $type] + $stamp);
+            $id = DB::table('organizations')->where('key', $key)->value('id');
 
-            return DB::table('organizations')->where('key', $key)->value('id');
+            // the same body can be both an awarding body and a professional body: one record, two roles
+            // (the roles table arrives in a later migration; that one backfills what this created)
+            if (Schema::hasTable('organization_roles')) {
+                DB::table('organization_roles')->insertOrIgnore(['organization_id' => $id, 'role' => $type, 'created_at' => $stamp['created_at'], 'updated_at' => $stamp['updated_at']]);
+            }
+
+            return $id;
         };
 
         $fold = function (string $table, string $kind, callable $map) use (&$added, $stamp) {

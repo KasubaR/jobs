@@ -10,4 +10,15 @@ class Organization extends Model
     protected $guarded = [];
 
     protected $casts = ['aliases' => 'array'];
+
+    public function roles(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(OrganizationRole::class);
+    }
+
+    /** @return list<string> every role this organization has */
+    public function roleNames(): array
+    {
+        return $this->roles->pluck('role')->all();
+    }
 }

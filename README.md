@@ -5,7 +5,7 @@ Private Zambian job market intelligence platform. Single user, password sign-in 
 Plain Laravel + Blade (no admin framework). The look follows `Design/Afghan Product – Admin Panel.html`.
 
 - Collects job ads only from sources marked `approved` and `active` in the source register.
-- Raw ad text is kept 90 days, then cleared; structured data is kept.
+- Raw ad text is kept 90 days, then cleared; structured data is kept. So is the short phrase an employer wrote for each qualification (for example "Degree in Accounting", at most 120 characters), so a match can always be traced to the employer's own wording. The sentence around it goes with the raw text.
 
 ## Setup
 
@@ -234,11 +234,16 @@ Some sources are set not to keep ad text (`retain_raw` off, for example where th
 
 | Type | Columns (required first) |
 |---|---|
-| `organizations` | `key, name, type` (awarding_body, professional_body, university, college, regulator, exam_board), `country, website, aliases` |
+| `organizations` | `key, name, type` (awarding_body, professional_body, university, college, regulator, exam_board; several roles with `|`, e.g. `university|awarding_body`, the first is the primary one; a later file never removes a role), `country, website, aliases` |
 | `qualifications` | `key, name, kind` (academic, professional, registration, vocational, short_course), `level, field, awarding_organization, duration_months, entry_requirements, aliases` |
 | `recognitions` | `qualification, authority, status` (accredited, registered, recognised, not_recognised, unknown), `scope, reference, valid_from, valid_to` |
 | `programmes` | `qualification, provider`, `name, mode, duration_months, location, accreditation_status, url` |
+| `relationships` | `from, to, type` (progression, equivalent, prerequisite, exemption, related), `basis, note` |
 
 `aliases` are separated by `|`. `level` is a qualification level key (school, certificate, diploma, bachelor, postgraduate, masters, phd) and `field` a field-of-study key.
 
 **Sources.** Qualifications, recognitions and programmes files may add `source_url`, `source_document`, `note`, `verified_on` (YYYY-MM-DD) and `verified_by`. A source is saved as evidence. A record is only marked verified when a row has a source **and** a `verified_on` date, so nothing shows as verified without something to point at.
+
+**Official or only a comparison.** A relationship's `basis` is `comparison` unless you say `official`, and `official` is refused without a source and a `verified_on` date. An international qualification is never treated as equivalent to a Zambian one by default: store the authority's determination where one exists, and the profile labels everything else "Unverified comparison".
+
+**Change history.** Every field an import, the Review screen or the Employers screen changes is written to `data_change_logs` (who, what, from, to, through which door) and the latest changes show at the bottom of a qualification's profile.

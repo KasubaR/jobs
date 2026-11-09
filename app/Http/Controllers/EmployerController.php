@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ChangeLog;
 use App\Taxonomy\TaxonomyIndex;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,7 +59,9 @@ class EmployerController extends Controller
 
         $d = $request->validate(['industry_id' => ['nullable', 'integer', Rule::exists('industries', 'id')]]);
 
+        $old = DB::table('employers')->where('id', $employer)->value('industry_id');
         DB::table('employers')->where('id', $employer)->update(['industry_id' => $d['industry_id'] ?? null, 'updated_at' => now()]);
+        ChangeLog::record('employers', $employer, 'industry_id', $old, $d['industry_id'] ?? null, 'employers_screen');
 
         return back()->with('status', ($d['industry_id'] ?? null) ? 'Saved. It applies to all of this employer\'s vacancies and is counted in the next statistics rebuild.' : 'The industry was cleared.');
     }
