@@ -145,6 +145,57 @@ class RequirementReaderTest extends TestCase
         $this->assertFalse($read['read_text']);
     }
 
+    // ---- found by reading real ads ----
+
+    public function test_an_employer_describing_its_own_age_is_not_experience(): void
+    {
+        $read = $this->read("About us:\nWith 75 years of experience, our focus is on children.\nRequirements:\nMinimum of 3 years relevant experience in a finance role.");
+
+        $this->assertSame([3], array_column($read['experiences'], 'min_years'));
+    }
+
+    public function test_a_degree_type_with_a_field_is_one_item_the_same_as_the_plain_wording(): void
+    {
+        $q = $this->read("Requirements:
+BSc in Accountancy.");
+
+        $this->assertCount(1, $q['qualifications']);
+        $this->assertSame('bachelor', $q['qualifications'][0]['education_level']);
+        $this->assertSame(DB::table('fields_of_study')->where('key', 'accounting')->value('id'), $q['qualifications'][0]['field_id']);
+    }
+
+    public function test_school_subjects_are_not_a_field_of_study(): void
+    {
+        $read = $this->read("Requirements:\nSchool Certificate with credit and above in Mathematics and English.");
+
+        $this->assertSame([null], array_column($read['qualifications'], 'field_id'));
+    }
+
+    public function test_an_experience_rule_that_names_two_levels_is_not_a_qualification(): void
+    {
+        $read = $this->read("Requirements:\nMinimum of 5 years (with high school diploma) or 2 years (with bachelor's degree) of relevant experience.");
+
+        $this->assertSame([], array_filter($read['qualifications'], fn ($q) => $q['candidate_text'] !== null));
+    }
+
+    public function test_or_its_equivalent_is_not_part_of_the_field(): void
+    {
+        $read = $this->read("Requirements:\nDegree in Accounting or its equivalent.");
+
+        $this->assertArrayHasKey('bachelor/accounting', $this->quals($read));
+    }
+
+    public function test_a_title_with_the_employer_or_a_project_still_finds_its_occupation(): void
+    {
+        $job = $this->job('Requirements: ACCA.');
+        $job->rawPost->update(['raw_title' => 'Accountant – Treasury at Some Employer Ltd']);
+        $job->update(['title' => 'Accountant – Treasury at Some Employer Ltd', 'occupation_code' => null]);
+
+        app(RequirementApplier::class)->apply($job->refresh(), $job->rawPost);
+
+        $this->assertSame('2411', $job->fresh()->occupation_code);
+    }
+
     // ---- stored on the job ----
 
     private function job(string $body): Job

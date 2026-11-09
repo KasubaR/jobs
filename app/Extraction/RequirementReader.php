@@ -172,6 +172,9 @@ class RequirementReader
         $tables = ['award' => 'academic_award_id', 'professional' => 'professional_qualification_id', 'registration' => 'professional_registration_id'];
         foreach ($tables as $kind => $column) {
             foreach ($this->taxonomy->mentions($kind, $s) as $entry) {
+                if ($kind === 'award' && ! $entry->field_key) {
+                    continue; // BSc, BA, MSc ... only say the level; the level + field reading below covers them, so "BSc in Accountancy" and "Degree in Accounting" are one item
+                }
                 $named[] = [$kind, $column, $entry];
             }
         }
@@ -184,6 +187,9 @@ class RequirementReader
         $parsed = [];
         foreach ($clauses as $clause) {
             $p = $this->qualifications->parse($clause);
+            if ($p['status'] === 'ambiguous' && preg_match('/\d+\s*(?:years?|yrs?)/i', $clause)) {
+                continue; // "5 years (with a diploma) or 2 years (with a degree)" is about experience, not a qualification
+            }
             if ($p['status'] === 'ambiguous') {
                 $state->review = true;
                 $this->addQualification($state, $base + [
@@ -206,6 +212,10 @@ class RequirementReader
         foreach ($parsed as $p) {
             $educationLevel = self::TO_EDUCATION_LEVEL[$p['level']] ?? $p['level'];
             $fieldText = $p['field'] ?? ($clauseGroup !== null ? $sharedField : null);
+            if ($fieldText !== null) {
+                $fieldText = trim(preg_replace('/\s+or\s+(?:its|their|an?|any)\s+equivalent.*$/iu', '', $fieldText), ' ,');
+                $fieldText = $fieldText === '' || $educationLevel === 'school' ? null : $fieldText;   // "Grade 12 with credit in Maths" names subjects, not a field of study
+            }
             $certain = $p['level'] !== 'degree';
             $fields = $fieldText === null ? [] : $this->fieldsIn($fieldText);
             $fieldGroup = count($fields) > 1 ? ++$state->group : null;
@@ -223,7 +233,7 @@ class RequirementReader
             foreach ($fields ?: [null] as $field) {
                 if ($award = $this->coveredByNamedAward($named, $educationLevel, $field)) {
                     if ($field !== null) {
-                        $refined[$award->id] = $field->id;   // "BEng in Mechanical Engineering": the award, with the narrower field
+                        $refined[$award->id][] = $field->id;   // "BEng in Mechanical Engineering": the award, with the narrower field
                     }
 
                     continue;
@@ -238,13 +248,18 @@ class RequirementReader
         }
         $group = count($named) > 1 && preg_match('/\bor\b|\//i', $s) ? ++$state->group : null;
         foreach ($named as [$kind, $column, $entry]) {
-            $this->addQualification($state, $base + [
-                'named_kind' => $kind, 'named_key' => $entry->key, $column => $entry->id,
-                'education_level' => $kind === 'award' ? $entry->level : null,
-                'field_id' => $refined[$entry->id] ?? ($kind === 'award' && $entry->field_key ? ($this->fieldIds[$entry->field_key] ?? null) : null),
-                'candidate_text' => null, 'requirement_level' => $level, 'alternative_group' => $group,
-                'confidence' => $this->score($weak ? 75 : 85, $source),
-            ]);
+            $own = $kind === 'award' && $entry->field_key ? ($this->fieldIds[$entry->field_key] ?? null) : null;
+            $fieldIds = array_values(array_unique($refined[$entry->id] ?? [])) ?: [$own];   // "BSc in Accounting or Finance": the award, once per field
+            $fieldGroup = count($fieldIds) > 1 ? ++$state->group : $group;
+
+            foreach ($fieldIds as $fieldId) {
+                $this->addQualification($state, $base + [
+                    'named_kind' => $kind, 'named_key' => $entry->key, $column => $entry->id,
+                    'education_level' => $kind === 'award' ? $entry->level : null, 'field_id' => $fieldId,
+                    'candidate_text' => null, 'requirement_level' => $level, 'alternative_group' => $fieldGroup,
+                    'confidence' => $this->score($weak ? 75 : 85, $source),
+                ]);
+            }
         }
     }
 
@@ -282,6 +297,9 @@ class RequirementReader
     {
         if (! preg_match('/\bexperience\b|\bexp\b|\bworked\b|\btrack\s+record\b/i', $s)) {
             return; // "a 2 year contract" is not experience
+        }
+        if (preg_match('/^(?:with|after|over|for)\s+(?:more\s+than\s+|over\s+)?\d+\s+years/i', $s)) {
+            return; // "With 75 years of experience, our focus is..." is the employer talking about itself
         }
 
         $p = $this->experience->parse($s);

@@ -48,7 +48,7 @@ class RequirementApplier
 
             $title = (string) $job->title;
             $job->forceFill([
-                'occupation_code' => $this->taxonomy->occupation($title)?->code,
+                'occupation_code' => $this->occupationFor($title),
                 'seniority' => $this->taxonomy->seniority($title)->key,
             ]);
         });
@@ -115,6 +115,21 @@ class RequirementApplier
         };
 
         return $table === null ? null : DB::table('directory_qualifications')->where('legacy_table', $table)->where('legacy_key', $key)->value('id');
+    }
+
+    /** Titles come as "Analyst – Budgeting at World Vision" or "M&E (Monitoring) Expert – Roads": try the whole title, then the role part. */
+    private function occupationFor(string $title): ?string
+    {
+        $noEmployer = preg_replace('/\s+at\s+[^–—-]*$/iu', '', $title);
+        $noBrackets = trim(preg_replace('/\s*[(\[].*?[)\]]/u', '', $noEmployer));
+
+        foreach ([$title, $noEmployer, $noBrackets, preg_split('/\s+[–—-]\s+/u', $noBrackets)[0]] as $candidate) {
+            if ($code = $this->taxonomy->occupation(trim($candidate))?->code) {
+                return $code;
+            }
+        }
+
+        return null;
     }
 
     /** New alternative groups are numbered after the ones kept rows already use, so they never merge. */
