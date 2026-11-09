@@ -180,6 +180,18 @@ class StandardizationTest extends TestCase
         $this->assertSame('empty', $p->parse('')['status']);
     }
 
+    public function test_a_length_no_job_asks_for_is_not_read_as_experience(): void
+    {
+        $p = app(ExperienceParser::class);
+
+        // an employer's own history ("With 75 years of experience, our focus is...") is not a requirement
+        $this->assertSame('ignored', $p->parse('75 years of experience')['status']);
+        $this->assertSame('ok', $p->parse('40 years of experience')['status']);
+        // a real requirement beside it still counts
+        $r = $p->parse('75 years in the field; candidates need 3 years experience');
+        $this->assertSame(['ok', 36], [$r['status'], $r['min']]);
+    }
+
     // ---- employment type ----
 
     public function test_employment_types(): void

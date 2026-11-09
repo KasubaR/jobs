@@ -40,6 +40,26 @@ class DirectoryPageTest extends TestCase
         $this->get(route('directory.index', ['kind' => 'nonsense']))->assertSessionHasErrors('kind');
     }
 
+    public function test_memberships_and_registrations_are_not_listed_as_qualifications_unless_asked_for(): void
+    {
+        $this->signIn();
+
+        $this->get(route('directory.index'))->assertOk()->assertSee('Bachelor of Engineering')->assertDontSee('>EIZ membership</a>', false)->assertDontSee('>EIZ registered engineer</a>', false);
+        $this->get(route('directory.index', ['q' => 'EIZ']))->assertOk()->assertSee('No qualification matches');
+        $this->get(route('directory.index', ['kind' => 'registration']))->assertOk()->assertSee('>EIZ membership</a>', false)->assertSee('>EIZ registered engineer</a>', false);
+    }
+
+    public function test_a_degree_or_diploma_type_with_no_subject_is_not_listed_as_a_qualification(): void
+    {
+        $this->signIn();
+
+        // "Advanced Diploma in what?": hidden from the plain list, a school certificate and subject-bearing degrees stay
+        $this->get(route('directory.index'))->assertOk()
+            ->assertDontSee('>Advanced Diploma</a>', false)->assertDontSee('>Bachelor of Arts</a>', false)->assertDontSee('>Doctor of Philosophy</a>', false)
+            ->assertSee('>Bachelor of Engineering</a>', false)->assertSee('>Grade 12 School Certificate</a>', false);
+        $this->get(route('directory.index', ['kind' => 'general', 'q' => 'Advanced Diploma']))->assertOk()->assertSee('>Advanced Diploma</a>', false);
+    }
+
     public function test_a_new_profile_says_what_is_not_known_and_never_infers_recognition(): void
     {
         $this->signIn();

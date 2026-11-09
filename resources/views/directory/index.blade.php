@@ -7,8 +7,8 @@
   <form class="filters" method="GET" action="{{ route('directory.index') }}">
     <input type="search" name="q" value="{{ $filters['q'] }}" placeholder="Search by name or alias" aria-label="Search qualifications" maxlength="80">
     <select name="kind" aria-label="Kind">
-      <option value="">All kinds</option>
-      @foreach (['academic' => 'Academic', 'professional' => 'Professional', 'registration' => 'Registration and membership', 'vocational' => 'Vocational and trade', 'short_course' => 'Short course'] as $k => $label)
+      <option value="">All qualifications</option>
+      @foreach (['academic' => 'Academic', 'professional' => 'Professional', 'registration' => 'Memberships and registrations (not qualifications)', 'general' => 'Degree and diploma types with no subject (not qualifications)', 'vocational' => 'Vocational and trade', 'short_course' => 'Short course'] as $k => $label)
         <option value="{{ $k }}" @selected($filters['kind'] === $k)>{{ $label }}</option>
       @endforeach
     </select>

@@ -21,13 +21,22 @@ class DirectoryController extends Controller
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:80'],
-            'kind' => ['nullable', 'in:academic,professional,registration,vocational,short_course'],
+            'kind' => ['nullable', 'in:academic,professional,registration,general,vocational,short_course'],
         ]);
 
         $term = trim((string) ($filters['q'] ?? ''));
 
+        // Two things are not qualifications on their own and are left out of the plain list, shown only when asked for:
+        //  - a membership or registration (EIZ, ERB): something a person holds, not something they studied for
+        //  - a degree or diploma type with no subject ("Bachelor of Arts", "Advanced Diploma": in what?). The ad reader
+        //    still needs them to recognise the wording, so they stay in the data. A school certificate is complete without one.
+        $schoolLevel = DB::table('qualification_levels')->where('key', 'school')->select('id');
+        $general = fn ($q) => $q->where('kind', 'academic')->whereNull('field_id')->where(fn ($w) => $w->whereNull('level_id')->orWhereNotIn('level_id', $schoolLevel));
+
         $qualifications = DirectoryQualification::query()->with(['level', 'awardingOrganization'])
-            ->when($filters['kind'] ?? null, fn ($q, $kind) => $q->where('kind', $kind))
+            ->when($filters['kind'] ?? null,
+                fn ($q, $kind) => $kind === 'general' ? $general($q) : $q->where('kind', $kind),
+                fn ($q) => $q->where('kind', '!=', 'registration')->whereNot(fn ($w) => $general($w)))
             ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w->where('name', 'like', "%{$term}%")->orWhere('aliases', 'like', '%'.str_replace(['%', '_'], ['\\%', '\\_'], $term).'%')))
             ->orderBy('name')->paginate(40)->withQueryString();
 

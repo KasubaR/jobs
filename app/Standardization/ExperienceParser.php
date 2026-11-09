@@ -11,6 +11,9 @@ class ExperienceParser
 {
     private const WORDS = ['one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5, 'six' => 6, 'seven' => 7, 'eight' => 8, 'nine' => 9, 'ten' => 10, 'twelve' => 12, 'fifteen' => 15];
 
+    /** No vacancy asks for more than this; a larger figure is about someone else (a company's age, a project's length). */
+    private const MAX_MONTHS = 40 * 12;
+
     public function __construct(private TermDictionary $terms) {}
 
     /**
@@ -63,6 +66,14 @@ class ExperienceParser
             foreach ($m as $r) {
                 $matches[] = [self::months($r[2], $r[4]), null, ($r[1] ?? '') !== '' || ($r[3] ?? '') !== ''];
             }
+        }
+
+        // "With 75 years of experience, our focus is..." is an employer's history, not what a candidate needs
+        $implausible = array_filter($matches, fn ($x) => max($x[0], $x[1] ?? 0) > self::MAX_MONTHS);
+        $matches = array_values(array_filter($matches, fn ($x) => max($x[0], $x[1] ?? 0) <= self::MAX_MONTHS));
+
+        if ($implausible && ! $matches) {
+            return $out + ['status' => 'ignored'];
         }
 
         $distinct = array_unique(array_map(fn ($x) => $x[0].'/'.$x[1], $matches));
