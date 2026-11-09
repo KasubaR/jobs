@@ -18,6 +18,9 @@ class AppServiceProvider extends ServiceProvider
 
         // One dictionary per request or queued job, shared by every standardizer, so a changed mapping is seen by all.
         $this->app->scoped(\App\Standardization\TermDictionary::class);
+
+        // The taxonomy (skills, qualifications, fields, occupations, industries), read once and shared.
+        $this->app->scoped(\App\Taxonomy\TaxonomyIndex::class);
     }
 
     public function boot(): void

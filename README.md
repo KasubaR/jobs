@@ -39,6 +39,7 @@ php artisan schedule:work
 | `processing:dispatch [--limit=500] [--outdated] [--failed]` | Queue the processing job for ads still waiting (needs `PROCESSING_ENABLED=true`). `--outdated` also redoes jobs made with older reading rules; `--failed` retries ads whose processing failed |
 | `jobs:standardize [--all]` | Standardize jobs and rebuild their matching keys (only jobs made with older rules, or all with `--all`) |
 | `terms:install` | Add any missing starting words and places to the dictionary (never overwrites a correction you made) |
+| `taxonomy:install` | Add any missing skills, qualifications, fields, occupations and industries to the taxonomy (never changes an existing row) |
 | `jobs:sweep-status` | Re-check every job's status: expire past end dates, close ads a full-list source dropped, reopen ones that came back (scheduled daily at 04:00) |
 | `runs:cleanup` | Mark runs that never finished as failed (scheduled every 10 minutes) |
 | `raw:purge` | Clear raw ad text older than 90 days (scheduled daily) |
@@ -182,6 +183,31 @@ The same vacancy is often on the employer's site and on several boards. After a 
 - **Values to map**: see step 3.
 
 Run `php artisan migrate --force` after deploying. Jobs already marked before this step are compared the next time their ad is processed.
+
+## The taxonomy (Phase 7, step 1)
+
+The dictionaries and classifications that extraction maps wording onto. They live in the database, are installed by a migration and by `php artisan taxonomy:install`, and are never overwritten: the installer only adds what is missing, so a row you edit or add (`origin = person`) is kept.
+
+| Layer | Table | Examples |
+|---|---|---|
+| 1. Education level | (Phase 6 dictionary) | school, certificate, diploma, degree, bachelor, postgraduate, masters, phd |
+| 2. Academic qualification | `academic_awards` | BEng = Bachelor of Engineering (level bachelor, field Engineering), BSc, MBChB, MBA, PGD |
+| 3. Field of study | `fields_of_study` | 15 broad fields with specific fields under them: Engineering > Mechanical Engineering; Accounting and Finance > Accounting, Finance |
+| 4. Professional qualification | `professional_qualifications` | ACCA, CIMA, CPA, ZICA Technician, CIPS, PMP, PRINCE2, CCNA, NEBOSH |
+| 5. Membership or registration | `professional_registrations` | EIZ registered engineer, HPCZ, NMCZ, MCZ, LAZ practising certificate, ZICA membership, TCZ, valid driving licence |
+| Skills | `skills` | about 280, typed software, technical, soft or language, with a category and aliases ("MS Excel" and "Advanced Excel" are Microsoft Excel) |
+| Occupations | `occupations` | ISCO-08: the 10 major and 43 sub-major groups in full, and about 245 of the 436 unit groups (those most seen in job ads) with the job titles that belong to each |
+| Industries | `industries` | the 21 ISIC Rev. 4 sections, A to U |
+| Seniority | `seniority_levels` | intern, junior, standard, senior, manager, head, director, read from the words in a title |
+
+`App\Taxonomy\TaxonomyIndex` is how code uses it: `find($kind, $text)` says what a phrase is, `mentions($kind, $text)` lists the entries a text mentions in order of appearance, `occupation($title)` and `seniority($title)` classify a job title. Matching is on whole words, longest wording first, and a stretch of text is used once ("Microsoft Excel" is one skill, "Bachelor of Science in Nursing" is one award). An alias written `=SAP` in the data matches only in exactly that capitalisation, for short acronyms that are also words ("sap"). The index only reads.
+
+Things to know:
+- **Occupations are not the full ISCO-08 list.** A job that fits no unit group in the list is classified to its sub-major group until the unit group is added. Check codes and titles against the ILO's published ISCO-08 before publishing comparisons.
+- **A capitalised "Excel" at the start of a sentence** ("Excel at teamwork") is read as Microsoft Excel, the one known ambiguity. The extractor (step 4) uses the sentence around a skill to settle it.
+- The skills list is a starting point. It grows from real ads through the review screens (step 9), which add aliases and new skills as `origin = person`.
+
+After deploying, run `php artisan migrate --force`; it installs everything.
 
 ## Lost phone
 
