@@ -139,6 +139,67 @@ class AdvertisedDemand
         return ['degree_vacancies' => $degreeVacancies, 'with_professional' => $withProfessional, 'qualifications' => $rows];
     }
 
+    // ---- over time ----
+
+    /** A month with fewer analysed vacancies than this shows its count but no share. */
+    public const TREND_MIN_MONTH = 20;
+
+    /** The mix of sources a month's vacancies came from moving this many points (half the summed change in each source's share) from the month before marks it as a different mix. */
+    public const MIX_SHIFT_POINTS = 25;
+
+    /**
+     * Month by month: how many analysed vacancies there were and how many asked for the subject.
+     *
+     * The month is the ad's posting date, or the day it was first collected when the ad gives none. Counts alone mostly
+     * show which sources were switched on, so a share is only given for a month with TREND_MIN_MONTH vacancies, and a
+     * month whose source mix changed sharply from the one before is flagged. No direction is declared: whether a
+     * qualification is rising is for a person to judge from these figures and flags.
+     *
+     * @param array{type:'qualification', id:int}|array{type:'level', key:string} $subject
+     * @return Collection<int, object{month:string, vacancies:int, asking:int, share:?float, thin:bool, mix_changed:bool, mix_shift:?int}>
+     */
+    public function trend(array $subject): Collection
+    {
+        $month = 'substr(coalesce(jobs.posted_date, jobs.first_seen_at), 1, 7)';
+
+        $volume = $this->analysedQuery()->join('raw_job_posts as rp', 'rp.id', '=', 'jobs.raw_job_post_id')
+            ->groupBy(DB::raw($month), 'rp.source_id')->selectRaw("{$month} as month, rp.source_id, count(distinct jobs.id) as n")->get()->groupBy('month');
+
+        if ($volume->isEmpty()) {
+            return collect();
+        }
+
+        $asks = $this->asks();
+        $subject['type'] === 'level' ? $asks->where('jq.education_level', $subject['key']) : $asks->where('jq.directory_qualification_id', $subject['id']);
+        $asking = $asks->groupBy(DB::raw($month))->selectRaw("{$month} as month, count(distinct jobs.id) as n")->pluck('n', 'month');
+
+        $months = [];
+        for ($m = \Illuminate\Support\Carbon::createFromFormat('Y-m', $volume->keys()->min())->startOfMonth(), $last = \Illuminate\Support\Carbon::createFromFormat('Y-m', $volume->keys()->max())->startOfMonth(); $m->lte($last); $m = $m->copy()->addMonth()) {
+            $months[] = $m->format('Y-m');
+        }
+
+        $previous = null;   // each source's share of the last month that had vacancies
+
+        return collect($months)->map(function (string $m) use ($volume, $asking, &$previous) {
+            $sources = $volume[$m] ?? collect();
+            $total = (int) $sources->sum('n');
+            $mix = $total > 0 ? $sources->mapWithKeys(fn ($s) => [$s->source_id => $s->n / $total * 100])->all() : null;
+
+            $row = (object) ['month' => $m, 'vacancies' => $total, 'asking' => (int) ($asking[$m] ?? 0), 'mix_shift' => null];
+            $row->thin = $total < self::TREND_MIN_MONTH;
+            $row->share = $row->thin ? null : round($row->asking / $total * 100);
+
+            if ($mix !== null && $previous !== null) {
+                $ids = array_unique(array_merge(array_keys($mix), array_keys($previous)));
+                $row->mix_shift = (int) round(array_sum(array_map(fn ($id) => abs(($mix[$id] ?? 0) - ($previous[$id] ?? 0)), $ids)) / 2);
+            }
+            $row->mix_changed = $row->mix_shift !== null && $row->mix_shift >= self::MIX_SHIFT_POINTS;
+            $previous = $mix ?? $previous;
+
+            return $row;
+        });
+    }
+
     // ---- by group: an occupation or an industry ----
 
     public const DIMENSIONS = ['occupation', 'industry'];

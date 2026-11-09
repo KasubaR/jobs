@@ -221,6 +221,86 @@ class AdvertisedDemandTest extends TestCase
         $this->get(route('insights.group', ['dimension' => 'occupation', 'level' => 'nonsense']))->assertSessionHasErrors('level');
     }
 
+    // ---- over time ----
+
+    private function posted(string $date, string $requirements, string $source = 'company'): Job
+    {
+        $this->n++;
+
+        return $this->ad($this->sourceSet()[$source], ['employer' => "Employer {$this->n} Ltd", 'date_posted' => $date, 'valid_through' => '2027-06-30'],
+            ['raw_title' => 'Accountant', 'raw_content' => '<p>Requirements:<br>'.nl2br(e($requirements)).'</p>']);
+    }
+
+    private function acca_id(): int
+    {
+        return (int) DB::table('directory_qualifications')->where('key', 'professional.acca')->value('id');
+    }
+
+    public function test_a_trend_is_by_month_with_shares_only_for_months_with_enough_vacancies_and_gaps_shown(): void
+    {
+        for ($i = 0; $i < 10; $i++) {
+            $this->posted('2026-08-10', 'ACCA is required.');
+            $this->posted('2026-08-12', 'Excel.');
+        }
+        for ($i = 0; $i < 3; $i++) {
+            $this->posted('2026-10-05', 'ACCA is required.');
+        }
+
+        $months = (new AdvertisedDemand)->trend(['type' => 'qualification', 'id' => $this->acca_id()])->keyBy('month');
+
+        $this->assertSame(['2026-08', '2026-09', '2026-10'], $months->keys()->all());
+        $this->assertSame([20, 10], [$months['2026-08']->vacancies, $months['2026-08']->asking]);
+        $this->assertSame(50.0, (float) $months['2026-08']->share);
+        $this->assertSame(0, $months['2026-09']->vacancies, 'a month with nothing is shown, not skipped');
+        $this->assertNull($months['2026-10']->share, '3 vacancies is too few for a share');
+        $this->assertSame(3, $months['2026-10']->asking, 'but the count is still shown');
+        $this->assertTrue($months['2026-10']->thin);
+    }
+
+    public function test_a_change_in_which_sources_were_collected_is_flagged_not_hidden(): void
+    {
+        for ($i = 0; $i < 4; $i++) {
+            $this->posted('2026-08-10', 'ACCA is required.', 'company');
+            $this->posted('2026-09-10', 'ACCA is required.', 'boardA');
+        }
+        for ($i = 0; $i < 4; $i++) {
+            $this->posted('2026-10-10', 'ACCA is required.', 'boardA');
+        }
+
+        $months = (new AdvertisedDemand)->trend(['type' => 'qualification', 'id' => $this->acca_id()])->keyBy('month');
+
+        $this->assertNull($months['2026-08']->mix_shift, 'nothing before the first month to compare with');
+        $this->assertTrue($months['2026-09']->mix_changed, 'all from one source, then all from another');
+        $this->assertSame(100, $months['2026-09']->mix_shift);
+        $this->assertFalse($months['2026-10']->mix_changed, 'the same source as the month before');
+    }
+
+    public function test_a_level_can_be_followed_and_the_month_falls_back_to_when_the_ad_was_first_collected(): void
+    {
+        $this->posted('2026-08-10', "Bachelor's Degree in Accounting.");
+        $job = $this->posted('2026-08-11', "Bachelor's Degree in Accounting.");
+        $job->update(['posted_date' => null, 'first_seen_at' => '2026-09-20 10:00:00']);
+
+        $months = (new AdvertisedDemand)->trend(['type' => 'level', 'key' => 'bachelor'])->keyBy('month');
+
+        $this->assertSame(1, $months['2026-08']->asking);
+        $this->assertSame(1, $months['2026-09']->asking);
+    }
+
+    public function test_the_trends_page_explains_the_limits_and_does_not_declare_a_direction(): void
+    {
+        $this->signIn();
+        $this->posted('2026-08-10', 'ACCA is required.');
+
+        $this->get(route('insights.trends'))->assertOk()
+            ->assertSee('Changes over time')->assertSee('not the Zambian labour market', false)
+            ->assertSee('different sources or employers were collected', false)
+            ->assertSee('does not say a qualification is "growing"', false)->assertSee('Aug 2026')->assertSee('too few to read');
+        $this->get(route('insights.trends', ['subject' => 'level:bachelor']))->assertOk()->assertSee('Bachelor');
+        $this->get(route('insights.trends', ['subject' => 'qualification:999999']))->assertOk()->assertSee('Nothing to follow');
+        $this->get(route('insights.trends', ['province' => 999999]))->assertSessionHasErrors('province');
+    }
+
     // ---- the page ----
 
     public function test_the_page_needs_a_signed_in_administrator(): void

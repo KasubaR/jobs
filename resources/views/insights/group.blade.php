@@ -17,6 +17,7 @@
     <a class="btn sm" href="{{ route('insights.index', $query()) }}">Overview</a>
     <a class="btn sm {{ $isOcc ? 'primary' : '' }}" href="{{ route('insights.group', ['dimension' => 'occupation'] + $query()) }}">By occupation</a>
     <a class="btn sm {{ ! $isOcc ? 'primary' : '' }}" href="{{ route('insights.group', ['dimension' => 'industry'] + $query()) }}">By industry</a>
+    <a class="btn sm" href="{{ route('insights.trends') }}">Over time</a>
   </div>
 
   <form class="filters" method="GET" action="{{ route('insights.group', $dimension) }}">

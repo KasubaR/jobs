@@ -16,6 +16,7 @@
     <a class="btn sm primary" href="{{ route('insights.index') }}">Overview</a>
     <a class="btn sm" href="{{ route('insights.group', 'occupation') }}">By occupation</a>
     <a class="btn sm" href="{{ route('insights.group', 'industry') }}">By industry</a>
+    <a class="btn sm" href="{{ route('insights.trends') }}">Over time</a>
   </div>
 
   <form class="filters" method="GET" action="{{ route('insights.index') }}">

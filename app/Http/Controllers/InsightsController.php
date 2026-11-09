@@ -11,6 +11,44 @@ use Illuminate\View\View;
 /** Reports on advertised demand. Every figure goes through AdvertisedDemand so they all count the same way. */
 class InsightsController extends Controller
 {
+    /** How often one qualification or level is asked for, month by month. Posting date, so open and closed vacancies are both included. */
+    public function trends(Request $request): View
+    {
+        $filters = $request->validate([
+            'subject' => ['nullable', 'string', 'max:40'],
+            'province' => ['nullable', 'integer', Rule::exists('locations', 'id')->where('type', 'province')],
+        ]);
+        $province = $filters['province'] ?? null;
+        $demand = new AdvertisedDemand('all', $province ? (int) $province : null);
+
+        $levels = DB::table('qualification_levels')->orderBy('rank')->pluck('name', 'key');
+        $qualifications = $demand->qualificationsAsked(30);
+
+        $subject = $filters['subject'] ?? ($qualifications->isNotEmpty() ? 'qualification:'.$qualifications->first()->id : null);
+        $parsed = null;
+        $name = null;
+        if ($subject && preg_match('/^(qualification|level):(.+)$/', $subject, $m)) {
+            if ($m[1] === 'level' && isset($levels[$m[2]])) {
+                $parsed = ['type' => 'level', 'key' => $m[2]];
+                $name = $levels[$m[2]].' (any field)';
+            } elseif ($m[1] === 'qualification' && ctype_digit($m[2]) && ($q = DB::table('directory_qualifications')->where('id', $m[2])->first())) {
+                $parsed = ['type' => 'qualification', 'id' => (int) $q->id];
+                $name = $q->name;
+            }
+        }
+
+        return view('insights.trends', [
+            'filters' => ['subject' => $subject, 'province' => $province],
+            'provinces' => DB::table('locations')->where('type', 'province')->orderBy('name')->pluck('name', 'id'),
+            'qualifications' => $qualifications,
+            'levels' => $levels,
+            'name' => $name,
+            'months' => $parsed ? $demand->trend($parsed) : collect(),
+            'minMonth' => AdvertisedDemand::TREND_MIN_MONTH,
+            'shift' => AdvertisedDemand::MIX_SHIFT_POINTS,
+        ]);
+    }
+
     /** Qualifications asked for within one occupation or one industry. */
     public function group(Request $request, string $dimension): View
     {
