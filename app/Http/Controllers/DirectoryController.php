@@ -1,0 +1,123 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\DirectoryQualification;
+use App\Taxonomy\LinkStatsBuilder;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+
+/**
+ * The Qualification Directory. A profile keeps four different facts apart, each with its own source:
+ * the qualification existing, it being recognised in Zambia, where it can be studied, and employer demand.
+ * An advertisement only ever speaks to demand.
+ */
+class DirectoryController extends Controller
+{
+    private const TOP = 8;
+
+    public function index(Request $request): View
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:80'],
+            'kind' => ['nullable', 'in:academic,professional,registration,vocational,short_course'],
+        ]);
+
+        $term = trim((string) ($filters['q'] ?? ''));
+
+        $qualifications = DirectoryQualification::query()->with(['level', 'awardingOrganization'])
+            ->when($filters['kind'] ?? null, fn ($q, $kind) => $q->where('kind', $kind))
+            ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w->where('name', 'like', "%{$term}%")->orWhere('aliases', 'like', '%'.str_replace(['%', '_'], ['\\%', '\\_'], $term).'%')))
+            ->orderBy('name')->paginate(40)->withQueryString();
+
+        return view('directory.index', ['qualifications' => $qualifications, 'filters' => ['q' => $term, 'kind' => $filters['kind'] ?? null]]);
+    }
+
+    public function show(DirectoryQualification $qualification): View
+    {
+        $id = $qualification->id;
+        $qualification->load(['level', 'awardingOrganization']);
+
+        $recognitions = $qualification->recognitions()->with(['authority', 'evidence'])->get();
+        $programmes = $qualification->programmes()->with('provider')->get();
+        $locations = DB::table('locations')->whereIn('id', $programmes->pluck('location_id')->filter())->pluck('name', 'id');
+
+        $relations = DB::table('qualification_relationships as r')
+            ->join('directory_qualifications as o', 'o.id', '=', DB::raw('case when r.from_id = '.(int) $id.' then r.to_id else r.from_id end'))
+            ->where(fn ($q) => $q->where('r.from_id', $id)->orWhere('r.to_id', $id))
+            ->get(['r.type', 'r.note', 'r.from_id', 'o.id as other_id', 'o.name as other_name']);
+
+        return view('directory.show', [
+            'q' => $qualification,
+            'field' => $qualification->field_id ? DB::table('fields_of_study as f')->leftJoin('fields_of_study as p', 'p.id', '=', 'f.parent_id')->where('f.id', $qualification->field_id)->first(['f.name', 'p.name as parent']) : null,
+            'recognitions' => $recognitions,
+            'programmes' => $programmes,
+            'locations' => $locations,
+            'relations' => $relations,
+            'evidence' => $this->evidence($qualification, $recognitions, $programmes),
+            'demand' => $this->demand($id),
+            'links' => $this->links($id),
+            'wordings' => $this->wordings($id),
+            'minSample' => LinkStatsBuilder::MIN_SAMPLE,
+        ]);
+    }
+
+    /** Every source behind this page's facts, newest first. */
+    private function evidence(DirectoryQualification $q, $recognitions, $programmes)
+    {
+        return DB::table('evidence')->where(function ($w) use ($q, $recognitions, $programmes) {
+            $w->where(fn ($x) => $x->where('subject_type', DirectoryQualification::class)->where('subject_id', $q->id));
+            foreach ([[\App\Models\Recognition::class, $recognitions], [\App\Models\Programme::class, $programmes]] as [$type, $rows]) {
+                if ($rows->isNotEmpty()) {
+                    $w->orWhere(fn ($x) => $x->where('subject_type', $type)->whereIn('subject_id', $rows->pluck('id')));
+                }
+            }
+        })->orderByDesc('verified_at')->orderByDesc('id')->get();
+    }
+
+    /** Vacancies asking for it, counted once each (copies and rejected ads left out; required or preferred only). */
+    private function demand(int $id): array
+    {
+        $rows = DB::table('job_qualifications as jq')->join('jobs', 'jobs.id', '=', 'jq.job_id')
+            ->where('jq.directory_qualification_id', $id)->where('jq.removed', false)->whereIn('jq.requirement_level', ['required', 'preferred'])
+            ->whereNotIn('jobs.status', ['duplicate', 'rejected'])
+            ->groupBy('jobs.id', 'jobs.status')
+            ->selectRaw("jobs.id, jobs.status, max(case when jq.requirement_level = 'required' then 1 else 0 end) as required")->get();
+
+        return [
+            'vacancies' => $rows->count(),
+            'required' => $rows->where('required', 1)->count(),
+            'open' => $rows->where('status', 'published')->count(),
+        ];
+    }
+
+    /** @return array{occupation: \Illuminate\Support\Collection, skill: \Illuminate\Support\Collection, industry: \Illuminate\Support\Collection, sample: int, computed_at: ?string} */
+    private function links(int $id): array
+    {
+        $stats = DB::table('qualification_link_stats')->where('directory_qualification_id', $id)->orderByDesc('jobs')->get()->groupBy('link_type');
+        $names = [
+            'occupation' => DB::table('occupations')->pluck('title', 'code'),
+            'skill' => DB::table('skills')->pluck('name', 'id'),
+            'industry' => DB::table('industries')->pluck('name', 'id'),
+        ];
+
+        $out = ['sample' => (int) ($stats->flatten()->first()->qualification_jobs ?? 0), 'computed_at' => $stats->flatten()->first()->computed_at ?? null];
+        foreach ($names as $type => $lookup) {
+            $out[$type] = ($stats[$type] ?? collect())->take(self::TOP)->map(fn ($s) => (object) [
+                'name' => $lookup[$s->target] ?? $s->target, 'jobs' => $s->jobs, 'share' => $s->qualification_jobs > 0 ? round($s->jobs / $s->qualification_jobs * 100) : 0,
+            ])->values();
+        }
+
+        return $out;
+    }
+
+    /** How employers actually wrote it, in their own words (kept only while the ad text is kept). */
+    private function wordings(int $id)
+    {
+        return DB::table('job_qualifications as jq')->join('jobs', 'jobs.id', '=', 'jq.job_id')
+            ->where('jq.directory_qualification_id', $id)->where('jq.removed', false)->whereNotNull('jq.evidence')
+            ->whereNotIn('jobs.status', ['duplicate', 'rejected'])
+            ->groupBy('jq.evidence')->selectRaw('jq.evidence, count(*) as n, max(jobs.id) as job_id')->orderByDesc('n')->limit(6)->get();
+    }
+}

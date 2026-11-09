@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DuplicateController;
 use App\Http\Controllers\JobController;
+use App\Http\Controllers\DirectoryController;
 use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\RunController;
 use App\Http\Controllers\SecurityController;
@@ -38,6 +39,9 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
     Route::get('/runs/{run}', [RunController::class, 'show'])->name('runs.show');
 
     Route::get('/qualifications', [QualificationController::class, 'index'])->name('qualifications.index');
+
+    Route::get('/directory', [DirectoryController::class, 'index'])->name('directory.index');
+    Route::get('/directory/{qualification}', [DirectoryController::class, 'show'])->whereNumber('qualification')->name('directory.show');
 
     Route::get('/jobs', [JobController::class, 'index'])->name('jobs.index');
     Route::get('/jobs/{job}', [JobController::class, 'show'])->whereNumber('job')->name('jobs.show');
