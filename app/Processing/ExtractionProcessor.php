@@ -21,13 +21,14 @@ use Throwable;
 class ExtractionProcessor implements RawPostProcessor
 {
     /** Raised when the reading rules improve, so older jobs can be found and reprocessed. */
-    public const VERSION = 3;
+    public const VERSION = 4;
 
     public function __construct(
         private JobExtractor $extractor,
         private JobStatusService $status,
         private JobStandardizer $standardizer,
         private DuplicateDetector $duplicates,
+        private RequirementApplier $requirements,
     ) {}
 
     public function process(RawJobPost $post): bool
@@ -67,6 +68,9 @@ class ExtractionProcessor implements RawPostProcessor
 
             // Standardized values and matching keys go next to what the ad wrote; the originals above are not touched.
             $this->standardizer->standardize($job, $post);
+
+            // What the ad asks for (qualifications, skills, experience), read from the whole text.
+            $this->requirements->apply($job, $post);
 
             // The status follows the dates and the review state, never "it is still online".
             $this->status->evaluate($job);

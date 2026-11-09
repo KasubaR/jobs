@@ -27,6 +27,10 @@ class ExtractedItemsSchemaTest extends TestCase
         config(['job_intel.collector_contact' => 'owner@example.com']);
         $this->seed(SourceSeeder::class);
         $this->job = $this->ad($this->sourceSet()['company']);
+        foreach (['job_skills', 'job_qualifications', 'job_experiences'] as $t) {
+            DB::table($t)->where('job_id', $this->job->id)->delete();   // these tests are about the schema, not about what the reader found
+        }
+        $this->job->forceFill(['analysis_status' => 'pending', 'analysis_method' => null, 'analysis_version' => 0, 'analysed_at' => null, 'occupation_code' => null, 'seniority' => null])->save();
     }
 
     private function id(string $table, string $key = 'key', ?string $value = null): int

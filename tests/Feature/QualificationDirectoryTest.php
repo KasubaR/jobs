@@ -57,6 +57,7 @@ class QualificationDirectoryTest extends TestCase
         config(['job_intel.collector_contact' => 'owner@example.com']);
         $this->seed(SourceSeeder::class);
         $job = $this->ad($this->sourceSet()['company'])->id;
+        DB::table('job_qualifications')->where('job_id', $job)->delete();   // the schema is under test, not the reader
         $acca = DB::table('professional_qualifications')->where('key', 'acca')->value('id');
         DB::table('job_qualifications')->insert(['job_id' => $job, 'professional_qualification_id' => $acca]);
 

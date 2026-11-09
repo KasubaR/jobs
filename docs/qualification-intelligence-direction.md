@@ -56,3 +56,19 @@ The existing `sources` register is for job ads. Directory sources (university si
 ## Status
 
 Built: items 1 to 7, the fold (`DirectoryFold`, also run by `php artisan taxonomy:install`), and `sources.purpose`. Folded rows are `unverified`. Tested on SQLite only; run `php artisan migrate` on MariaDB to confirm there.
+
+## Domain D (employment-market intelligence) and Domain E (classification and relationships)
+
+**Domain D: ads as evidence of demand.** The storage is built (Phase 7 step 2): `job_qualifications`, `job_skills` and `job_experiences` carry requirement level (required, preferred, advantage, mentioned), either-or groups, confidence, the exact evidence wording, and review flags; `jobs` carries occupation, seniority, employer, location and industry. Not built: the extractor that fills them from the ad body (today the reader sets one qualification level and one experience figure per job).
+
+**Domain E: matching and relationships.**
+- Matching exists as `TaxonomyIndex` (whole-word, longest-phrase, alias-based). It reads the three old taxonomy tables, not the directory, and it only recognises named awards (BEng, ACCA). It does not yet recognise "Degree in Accounting and Finance" or "First Degree in Accounting" as level plus field.
+- Exact wording is already preserved: `evidence` holds the ad's words and `candidate_text` holds wording the taxonomy does not know, never forced into the nearest entry.
+- Relationships built: qualification to field, level, awarding body (`directory_qualifications`), qualification to provider (`programmes`), qualification to qualification (`qualification_relationships`).
+- Relationships missing: qualification to occupations, qualification to skills, qualification to industry demand. Occupation and skill links should be derived from observed ads (counted, with a minimum sample) and kept apart from any curated link, so "employers asking for this also ask for that" is never presented as "this qualification leads to that job".
+
+## Proposed next steps
+
+1. Extractor (Phase 7 step 3): read qualifications, skills and experience from the ad body into the Phase 7 tables, matching against the directory, recording level and field separately when no named award is given.
+2. Observed-link tables: `qualification_occupation_stats`, `qualification_skill_stats`, `qualification_industry_stats`, rebuilt from live job rows.
+3. Point `TaxonomyIndex` at the directory.
