@@ -50,7 +50,7 @@
           <td class="nowrap"><b>{{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $m->month)->format('M Y') }}</b></td>
           <td class="nowrap">{{ $m->vacancies }}</td>
           <td class="nowrap">{{ $m->vacancies > 0 ? $m->asking : '—' }}</td>
-          <td style="min-width:140px">
+          <td style="min-width:110px">
             @if ($m->share !== null)
               <div class="h" style="display:flex;gap:8px;align-items:center"><span style="min-width:2.6em">{{ $m->share }}%</span>
                 <div class="bar" style="flex:1"><i style="width:{{ max(2, $m->share) }}%"></i></div></div>
@@ -60,14 +60,14 @@
           </td>
           <td>
             @if ($m->thin && $m->vacancies > 0)<span class="pill mut">Under {{ $minMonth }}</span>@endif
-            @if ($m->mix_changed)<span class="pill warn" title="The sources the month's vacancies came from shifted by {{ $m->mix_shift }} points from the month before">Different source mix</span>@endif
+            @if ($m->mix_changed)<span class="pill warn" style="white-space:normal;display:inline-block" title="The sources the month's vacancies came from shifted by {{ $m->mix_shift }} points from the month before">Source mix changed</span>@endif
           </td>
         </tr>
       @endforeach
       </tbody>
     </table>
   </div>
-  <p class="sub" style="margin-top:10px">"Different source mix": the sources that month's vacancies came from shifted by {{ $shift }} points or more (half the total change in each source's share) from the previous month with vacancies, so the month may not be comparable with the one before.</p>
+  <p class="sub" style="margin-top:10px">"Source mix changed": the sources that month's vacancies came from shifted by {{ $shift }} points or more (half the total change in each source's share) from the previous month with vacancies, so the month may not be comparable with the one before.</p>
 </section>
 @endif
 @endsection
