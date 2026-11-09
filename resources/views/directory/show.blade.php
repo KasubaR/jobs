@@ -88,6 +88,16 @@
   @endif
 </section>
 
+@if ($family)
+<section class="card">
+  <div class="hd"><div><h3>Same field family</h3><p class="sub">{{ $family['name'] }}: other entries at this level in related fields. They stay separate entries; this only relates them.</p></div></div>
+  @foreach ($family['members'] as $m)
+    <p style="margin:4px 0"><a href="{{ route('directory.show', $m->id) }}">{{ $m->name }}</a> <small>· {{ $m->vacancies }} {{ Str::plural('vacancy', $m->vacancies) }}</small></p>
+  @endforeach
+  <p class="sub" style="margin-top:10px">Counting the whole family, <b>{{ $family['vacancies'] }}</b> {{ Str::plural('vacancy', $family['vacancies']) }} ask for one of these, each counted once.</p>
+</section>
+@endif
+
 @if ($relations->isNotEmpty())
 <section class="card">
   <div class="hd"><div><h3>Related qualifications</h3></div></div>

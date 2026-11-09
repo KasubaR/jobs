@@ -95,6 +95,32 @@ class DirectoryPageTest extends TestCase
             ->assertSee('Shares of the 5 vacancies')->assertSee('Accountants')->assertSee('not where the qualification leads');
     }
 
+
+    public function test_entries_in_one_field_family_are_related_and_counted_together_once(): void
+    {
+        config(['job_intel.collector_contact' => 'owner@example.com']);
+        $this->seed(SourceSeeder::class);
+        $this->signIn();
+
+        $make = fn (string $line, int $n) => $this->ad($this->sourceSet()['company'], ['employer' => "Employer {$n} Ltd"], ['raw_title' => 'Officer', 'raw_content' => '<p>Requirements:<br>'.e($line).'</p>']);
+        $make('Degree in Accounting.', 1);
+        $make('Degree in Accounting and Finance.', 2);
+        $make('Degree in Accounting or Finance.', 3);   // asks for two entries of the family: still one vacancy
+        $make('Diploma in Accounting.', 4);             // another level: not the same family
+
+        $accounting = DirectoryQualification::where('key', 'academic.bachelor.accounting')->firstOrFail();
+
+        $this->get(route('directory.show', $accounting))->assertOk()
+            ->assertSee('Same field family')
+            ->assertSee('degree in Accounting and Finance')
+            ->assertSee('degree in Finance')
+            ->assertDontSee('Diploma in Accounting</a>', false)
+            ->assertSee('<b>3</b> vacancies ask for one of these', false);
+
+        // an entry on its own in its family shows no family card
+        $this->get(route('directory.show', $this->acca()))->assertDontSee('Same field family');
+    }
+
     public function test_a_missing_qualification_is_a_404(): void
     {
         $this->signIn();

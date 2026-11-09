@@ -57,6 +57,7 @@ class DirectoryController extends Controller
             'relations' => $relations,
             'evidence' => $this->evidence($qualification, $recognitions, $programmes),
             'demand' => $this->demand($id),
+            'family' => $this->family($qualification),
             'links' => $this->links($id),
             'wordings' => $this->wordings($id),
             'minSample' => LinkStatsBuilder::MIN_SAMPLE,
@@ -74,6 +75,45 @@ class DirectoryController extends Controller
                 }
             }
         })->orderByDesc('verified_at')->orderByDesc('id')->get();
+    }
+
+    /**
+     * The same level in the same field family: "Accounting", "Finance" and the broad "Accounting and Finance" are one family,
+     * so "Bachelor's in Accounting" and "Bachelor's in Accounting and Finance" are related, and the family's demand counts a
+     * vacancy once however many of them it asks for. The exact entries stay separate; this only relates them.
+     *
+     * @return ?array{name:string, members:\Illuminate\Support\Collection, vacancies:int}
+     */
+    private function family(DirectoryQualification $q): ?array
+    {
+        $field = $q->field_id ? DB::table('fields_of_study')->where('id', $q->field_id)->first() : null;
+        if (! $field || ! $q->level_id) {
+            return null;
+        }
+
+        $rootId = $field->parent_id ?? $field->id;
+        $ids = DB::table('fields_of_study')->where('id', $rootId)->orWhere('parent_id', $rootId)->pluck('id');
+
+        $entries = DB::table('directory_qualifications')->where('kind', 'academic')->where('level_id', $q->level_id)
+            ->whereIn('field_id', $ids)->whereNull('legacy_table')->get(['id', 'name']);
+        if ($entries->count() < 2) {
+            return null;
+        }
+
+        $perEntry = DB::table('job_qualifications as jq')->join('jobs', 'jobs.id', '=', 'jq.job_id')
+            ->whereIn('jq.directory_qualification_id', $entries->pluck('id'))->where('jq.removed', false)->whereIn('jq.requirement_level', ['required', 'preferred'])
+            ->whereNotIn('jobs.status', ['duplicate', 'rejected'])
+            ->groupBy('jq.directory_qualification_id')->selectRaw('jq.directory_qualification_id as id, count(distinct jq.job_id) as n')->pluck('n', 'id');
+
+        $together = DB::table('job_qualifications as jq')->join('jobs', 'jobs.id', '=', 'jq.job_id')
+            ->whereIn('jq.directory_qualification_id', $entries->pluck('id'))->where('jq.removed', false)->whereIn('jq.requirement_level', ['required', 'preferred'])
+            ->whereNotIn('jobs.status', ['duplicate', 'rejected'])->distinct()->count('jq.job_id');
+
+        return [
+            'name' => DB::table('fields_of_study')->where('id', $rootId)->value('name'),
+            'members' => $entries->where('id', '!=', $q->id)->map(fn ($e) => (object) ['id' => $e->id, 'name' => $e->name, 'vacancies' => (int) ($perEntry[$e->id] ?? 0)])->sortByDesc('vacancies')->values(),
+            'vacancies' => $together,
+        ];
     }
 
     /** Vacancies asking for it, counted once each (copies and rejected ads left out; required or preferred only). */
