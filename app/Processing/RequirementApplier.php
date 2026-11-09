@@ -114,7 +114,32 @@ class RequirementApplier
             default => [null, null],
         };
 
-        return $table === null ? null : DB::table('directory_qualifications')->where('legacy_table', $table)->where('legacy_key', $key)->value('id');
+        if ($table === null) {
+            return ! empty($r['education_level']) && ! empty($r['field_id']) ? $this->levelFieldEntry($r['education_level'], (int) $r['field_id']) : null;
+        }
+
+        return DB::table('directory_qualifications')->where('legacy_table', $table)->where('legacy_key', $key)->value('id');
+    }
+
+    /**
+     * "Bachelor's in Accounting", "BSc in Accountancy" and "First Degree in Accounting" are one directory entry:
+     * bachelor + accounting. Found or created here (unverified, origin 'extraction') so it has a profile, demand and links.
+     */
+    private function levelFieldEntry(string $level, int $fieldId): ?int
+    {
+        $levelRow = DB::table('qualification_levels')->where('key', $level)->first();
+        $field = DB::table('fields_of_study')->where('id', $fieldId)->first();
+        if (! $levelRow || ! $field) {
+            return null;
+        }
+
+        $key = "academic.{$level}.{$field->key}";
+        DB::table('directory_qualifications')->insertOrIgnore([
+            'key' => $key, 'name' => "{$levelRow->name} in {$field->name}", 'kind' => 'academic', 'level_id' => $levelRow->id,
+            'field_id' => $field->id, 'status' => 'unverified', 'origin' => 'extraction', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return DB::table('directory_qualifications')->where('key', $key)->value('id');
     }
 
     /** Titles come as "Analyst – Budgeting at World Vision" or "M&E (Monitoring) Expert – Roads": try the whole title, then the role part. */

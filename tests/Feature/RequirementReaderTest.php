@@ -198,12 +198,14 @@ BSc in Accountancy.");
 
     // ---- stored on the job ----
 
-    private function job(string $body): Job
+    private function job(string $body, int $n = 0): Job
     {
         config(['job_intel.collector_contact' => 'owner@example.com']);
-        $this->seed(SourceSeeder::class);
+        if (! \App\Models\Source::exists()) {
+            $this->seed(SourceSeeder::class);
+        }
 
-        return $this->ad($this->sourceSet()['company'], [], ['raw_title' => 'Accountant', 'raw_content' => '<p>'.nl2br(e($body)).'</p>']);
+        return $this->ad($this->sourceSet()['company'], ['employer' => "Employer {$n} Ltd"], ['raw_title' => 'Accountant', 'raw_content' => '<p>'.nl2br(e($body)).'</p>']);
     }
 
     public function test_processing_stores_the_items_and_the_job_classification(): void
@@ -236,6 +238,34 @@ BSc in Accountancy.");
         $this->assertTrue((bool) $job->qualifications()->whereNotNull('professional_qualification_id')->value('removed'));
         $this->assertSame(1, $job->qualifications()->where('education_level', 'bachelor')->count());
         $this->assertSame('preferred', $job->qualifications()->where('education_level', 'bachelor')->value('requirement_level'));
+    }
+
+    public function test_the_four_wordings_end_up_on_one_directory_entry(): void
+    {
+        $ids = [];
+        foreach (["Bachelor's Degree in Accounting", 'BSc in Accountancy', 'First Degree in Accounting', 'Degree in Accounting'] as $i => $wording) {
+            $job = $this->job("Requirements:\n{$wording}", $i)->refresh();
+            $row = $job->qualifications()->first();
+            $this->assertSame($wording, $row->evidence, 'the ad\'s own wording is kept on the item');
+            $ids[] = $row->directory_qualification_id;
+        }
+
+        $this->assertNotNull($ids[0]);
+        $this->assertCount(1, array_unique($ids));
+
+        $entry = \App\Models\DirectoryQualification::find($ids[0]);
+        $this->assertSame("Bachelor's degree in Accounting", $entry->name);
+        $this->assertSame('unverified', $entry->status);
+        $this->assertSame('extraction', $entry->origin);
+        $this->assertSame(1, \App\Models\DirectoryQualification::where('key', 'academic.bachelor.accounting')->count());
+    }
+
+    public function test_a_level_with_no_field_or_an_unknown_field_gets_no_directory_entry(): void
+    {
+        $before = \App\Models\DirectoryQualification::count();
+        $this->job("Requirements:\nA degree.\nDiploma in Underwater Basket Weaving.");
+
+        $this->assertSame($before, \App\Models\DirectoryQualification::count());
     }
 
     public function test_an_ad_with_no_text_and_no_published_facts_is_marked_no_text(): void
