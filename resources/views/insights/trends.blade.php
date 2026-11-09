@@ -11,12 +11,7 @@
 @include('partials.advertised-demand-note')
 
 <section class="card">
-  <div class="btns" style="margin-bottom:12px">
-    <a class="btn sm" href="{{ route('insights.index') }}">Overview</a>
-    <a class="btn sm" href="{{ route('insights.group', 'occupation') }}">By occupation</a>
-    <a class="btn sm" href="{{ route('insights.group', 'industry') }}">By industry</a>
-    <a class="btn sm primary" href="{{ route('insights.trends') }}">Over time</a>
-  </div>
+  @include('insights.partials.tabs', ['active' => 'trends'])
 
   <form class="filters" method="GET" action="{{ route('insights.trends') }}">
     <select name="subject" aria-label="What to follow">
@@ -31,6 +26,7 @@
       @foreach ($provinces as $id => $pname)<option value="{{ $id }}" @selected((string) $filters['province'] === (string) $id)>{{ $pname }}</option>@endforeach
     </select>
     <button class="btn" type="submit">Apply</button>
+    <a class="btn" href="{{ route('insights.export', array_filter(['report' => 'trends', 'subject' => $filters['subject'], 'province' => $filters['province']])) }}">Download CSV</a>
   </form>
 
   <p class="sub" style="margin:12px 0 0">

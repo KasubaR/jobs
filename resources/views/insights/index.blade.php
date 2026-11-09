@@ -12,12 +12,7 @@
 @include('partials.advertised-demand-note')
 
 <section class="card">
-  <div class="btns" style="margin-bottom:12px">
-    <a class="btn sm primary" href="{{ route('insights.index') }}">Overview</a>
-    <a class="btn sm" href="{{ route('insights.group', 'occupation') }}">By occupation</a>
-    <a class="btn sm" href="{{ route('insights.group', 'industry') }}">By industry</a>
-    <a class="btn sm" href="{{ route('insights.trends') }}">Over time</a>
-  </div>
+  @include('insights.partials.tabs', ['active' => 'overview'])
 
   <form class="filters" method="GET" action="{{ route('insights.index') }}">
     <select name="scope" aria-label="Which vacancies">
@@ -29,6 +24,13 @@
     </select>
     <button class="btn" type="submit">Apply</button>
     @if ($filters['scope'] !== 'all' || $filters['province'])<a class="btn" href="{{ route('insights.index') }}">Clear</a>@endif
+    @php $dl = array_filter(['scope' => $filters['scope'] === 'all' ? null : $filters['scope'], 'province' => $filters['province']]); @endphp
+    <span class="btns">Download CSV:
+      <a class="btn sm" href="{{ route('insights.export', ['report' => 'qualifications'] + $dl) }}">Qualifications</a>
+      <a class="btn sm" href="{{ route('insights.export', ['report' => 'levels'] + $dl) }}">Levels</a>
+      <a class="btn sm" href="{{ route('insights.export', ['report' => 'entry'] + $dl) }}">Entry-level</a>
+      <a class="btn sm" href="{{ route('insights.export', ['report' => 'professional'] + $dl) }}">Professional</a>
+    </span>
   </form>
 
   <div class="g4 st">

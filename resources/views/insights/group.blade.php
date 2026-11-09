@@ -13,12 +13,7 @@
 @include('partials.advertised-demand-note')
 
 <section class="card">
-  <div class="btns" style="margin-bottom:12px">
-    <a class="btn sm" href="{{ route('insights.index', $query()) }}">Overview</a>
-    <a class="btn sm {{ $isOcc ? 'primary' : '' }}" href="{{ route('insights.group', ['dimension' => 'occupation'] + $query()) }}">By occupation</a>
-    <a class="btn sm {{ ! $isOcc ? 'primary' : '' }}" href="{{ route('insights.group', ['dimension' => 'industry'] + $query()) }}">By industry</a>
-    <a class="btn sm" href="{{ route('insights.trends') }}">Over time</a>
-  </div>
+  @include('insights.partials.tabs', ['active' => $dimension])
 
   <form class="filters" method="GET" action="{{ route('insights.group', $dimension) }}">
     <select name="scope" aria-label="Which vacancies">
@@ -35,6 +30,7 @@
       </select>
     @endif
     <button class="btn" type="submit">Apply</button>
+    <a class="btn" href="{{ route('insights.export', ['report' => 'group', 'dimension' => $dimension] + $query(['group' => $filters['group']])) }}">Download CSV{{ $selected ? ' (this group)' : ' (all groups)' }}</a>
   </form>
 
   <p class="sub" style="margin:12px 0 0">

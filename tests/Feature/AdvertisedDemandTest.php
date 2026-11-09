@@ -301,6 +301,114 @@ class AdvertisedDemandTest extends TestCase
         $this->get(route('insights.trends', ['province' => 999999]))->assertSessionHasErrors('province');
     }
 
+    // ---- supply and demand ----
+
+    private function provider(string $key, string $name): int
+    {
+        return DB::table('organizations')->insertGetId(['key' => $key, 'name' => $name, 'type' => 'university', 'country' => 'ZM', 'origin' => 'person', 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    private function programme(int $qualificationId, int $providerId, bool $verified = false): void
+    {
+        DB::table('programmes')->insert(['provider_id' => $providerId, 'qualification_id' => $qualificationId, 'verified_at' => $verified ? now() : null, 'created_at' => now(), 'updated_at' => now()]);
+    }
+
+    public function test_supply_is_set_beside_demand_without_claiming_either_is_complete(): void
+    {
+        $this->many(5, "ACCA is required.\nBachelor's Degree in Accounting.");
+        $cima = (int) DB::table('directory_qualifications')->where('key', 'professional.cima')->value('id');
+        $bacc = (int) DB::table('directory_qualifications')->where('key', 'academic.bachelor.accounting')->value('id');
+        $a = $this->provider('a', 'Provider A');
+        $b = $this->provider('b', 'Provider B');
+        $this->programme($this->acca_id(), $a, true);
+        $this->programme($this->acca_id(), $b);
+        $this->programme($cima, $a);              // offered, but no vacancy asks for it
+
+        $report = (new \App\Analytics\SupplyVsDemand(new AdvertisedDemand))->report();
+        $rows = $report['rows']->keyBy('name');
+
+        $this->assertSame(['recorded', 2, 2, 1, 5], [$rows['ACCA']->status, $rows['ACCA']->providers, $rows['ACCA']->programmes, $rows['ACCA']->verified, $rows['ACCA']->vacancies]);
+        $this->assertSame('none_recorded', $rows["Bachelor's degree in Accounting"]->status, 'asked for, but no provider is recorded here');
+        $this->assertSame(['not_asked', 0], [$rows['CIMA']->status, $rows['CIMA']->vacancies]);
+        $this->assertSame([2, 1, 3, 2, 1], [$report['asked'], $report['asked_with_provider'], $report['programmes'], $report['providers'], $report['verified_programmes']]);
+        $this->assertGreaterThan(0, $bacc);
+    }
+
+    public function test_the_supply_page_warns_that_the_provider_side_is_incomplete(): void
+    {
+        $this->signIn();
+        $this->many(5, 'ACCA is required.');
+
+        $this->get(route('insights.supply'))->assertOk()
+            ->assertSee('only what has been entered into this directory', false)->assertSee('No provider recorded')
+            ->assertSee('not as a finding about the education system', false)->assertSee('not the Zambian labour market', false);
+    }
+
+    // ---- CSV export ----
+
+    private function csv(string $report, array $query = []): array
+    {
+        $response = $this->get(route('insights.export', ['report' => $report] + $query))->assertOk();
+        $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
+        $rows = array_map(fn ($l) => str_getcsv($l, ',', '"', ''), preg_split('/\R/', trim(ltrim($response->streamedContent(), "\xEF\xBB\xBF"))));
+
+        return [array_shift($rows), $rows];
+    }
+
+    public function test_a_report_downloads_as_csv_with_its_denominator_and_reliability(): void
+    {
+        $this->signIn();
+        $this->many(5, 'ACCA is required.');
+        $this->vacancy('CIMA is required.', 'Analyst');
+
+        [$header, $rows] = $this->csv('qualifications');
+
+        $this->assertSame(['qualification', 'kind', 'vacancies', 'required_vacancies', 'share_percent', 'vacancies_read', 'reliable'], $header);
+        $byName = collect($rows)->keyBy(0);
+        $this->assertSame(['5', '83', '6', 'yes'], [$byName['ACCA'][2], $byName['ACCA'][4], $byName['ACCA'][5], $byName['ACCA'][6]]);
+        $this->assertSame(['1', '', 'no'], [$byName['CIMA'][2], $byName['CIMA'][4], $byName['CIMA'][6]], 'a small sample has a count and no share');
+    }
+
+    public function test_every_report_can_be_downloaded_and_follows_the_filters(): void
+    {
+        $this->signIn();
+        $this->many(5, "ACCA is required.\nBachelor's Degree in Accounting.\n1 year experience.");
+        Job::first()->update(['status' => 'expired']);
+
+        foreach (['levels', 'entry', 'professional', 'group', 'trends', 'supply'] as $report) {
+            $this->csv($report);
+        }
+        [, $all] = $this->csv('qualifications');
+        [, $open] = $this->csv('qualifications', ['scope' => 'open']);
+        $this->assertSame('5', collect($all)->firstWhere(0, 'ACCA')[2]);
+        $this->assertSame('4', collect($open)->firstWhere(0, 'ACCA')[2]);
+
+        [, $trend] = $this->csv('trends', ['subject' => 'level:bachelor']);
+        $this->assertNotEmpty($trend);
+        [, $group] = $this->csv('group', ['dimension' => 'occupation', 'group' => '24']);
+        $this->assertSame('Business and Administration Professionals', $group[0][0] ?? null);
+    }
+
+    public function test_a_name_that_would_run_as_a_spreadsheet_formula_is_defused(): void
+    {
+        $this->signIn();
+        $q = DB::table('directory_qualifications')->insertGetId(['key' => 'evil', 'name' => '=HYPERLINK("http://example.test","click")', 'kind' => 'academic', 'status' => 'unverified', 'origin' => 'person', 'created_at' => now(), 'updated_at' => now()]);
+        $this->programme($q, $this->provider('p', 'P'));
+
+        [, $rows] = $this->csv('supply');
+
+        $this->assertStringStartsWith("'=HYPERLINK", collect($rows)->firstWhere(fn ($r) => str_contains($r[0], 'HYPERLINK'))[0]);
+    }
+
+    public function test_export_needs_a_sign_in_and_refuses_unknown_reports_and_bad_filters(): void
+    {
+        $this->get(route('insights.export', 'qualifications'))->assertRedirect();
+
+        $this->signIn();
+        $this->get('/insights/export/secrets')->assertNotFound();
+        $this->get(route('insights.export', ['report' => 'qualifications', 'scope' => 'x']))->assertSessionHasErrors('scope');
+    }
+
     // ---- the page ----
 
     public function test_the_page_needs_a_signed_in_administrator(): void

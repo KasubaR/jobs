@@ -11,6 +11,26 @@ use Illuminate\View\View;
 /** Reports on advertised demand. Every figure goes through AdvertisedDemand so they all count the same way. */
 class InsightsController extends Controller
 {
+    /** Providers recorded in the directory beside advertised demand. */
+    public function supply(Request $request): View
+    {
+        $filters = $request->validate([
+            'scope' => ['nullable', 'in:all,open'],
+            'province' => ['nullable', 'integer', Rule::exists('locations', 'id')->where('type', 'province')],
+        ]);
+        $scope = $filters['scope'] ?? 'all';
+        $province = $filters['province'] ?? null;
+        $demand = new AdvertisedDemand($scope, $province ? (int) $province : null);
+
+        return view('insights.supply', [
+            'filters' => ['scope' => $scope, 'province' => $province],
+            'provinces' => DB::table('locations')->where('type', 'province')->orderBy('name')->pluck('name', 'id'),
+            'report' => (new \App\Analytics\SupplyVsDemand($demand))->report(),
+            'analysed' => $demand->counts()['analysed'],
+            'minSample' => AdvertisedDemand::MIN_SAMPLE,
+        ]);
+    }
+
     /** How often one qualification or level is asked for, month by month. Posting date, so open and closed vacancies are both included. */
     public function trends(Request $request): View
     {

@@ -8,6 +8,7 @@ use App\Http\Controllers\JobController;
 use App\Http\Controllers\DirectoryController;
 use App\Http\Controllers\EmployerController;
 use App\Http\Controllers\InsightsController;
+use App\Http\Controllers\InsightsExportController;
 use App\Http\Controllers\QualificationController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\RunController;
@@ -44,6 +45,8 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
     Route::get('/qualifications', [QualificationController::class, 'index'])->name('qualifications.index');
 
     Route::get('/insights', [InsightsController::class, 'index'])->name('insights.index');
+    Route::get('/insights/export/{report}', [InsightsExportController::class, 'download'])->name('insights.export');
+    Route::get('/insights/supply', [InsightsController::class, 'supply'])->name('insights.supply');
     Route::get('/insights/trends', [InsightsController::class, 'trends'])->name('insights.trends');
     Route::get('/insights/{dimension}',[InsightsController::class, 'group'])->whereIn('dimension', ['occupation', 'industry'])->name('insights.group');
 
