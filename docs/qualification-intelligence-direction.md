@@ -70,5 +70,5 @@ Built: items 1 to 7, the fold (`DirectoryFold`, also run by `php artisan taxonom
 ## Proposed next steps
 
 1. Extractor (Phase 7 step 3): read qualifications, skills and experience from the ad body into the Phase 7 tables, matching against the directory, recording level and field separately when no named award is given.
-2. Observed-link tables: `qualification_occupation_stats`, `qualification_skill_stats`, `qualification_industry_stats`, rebuilt from live job rows.
+2. Observed links: built as one table, `qualification_link_stats` (link_type occupation, skill or industry), rebuilt daily by `stats:rebuild`. It stores the sample size beside each count; `LinkStatsBuilder::MIN_SAMPLE` (5) is the floor for showing a share. Industry is empty until jobs or employers are given an industry.
 3. Point `TaxonomyIndex` at the directory.

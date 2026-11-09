@@ -23,3 +23,6 @@ Schedule::command('raw:purge')->dailyAt('03:00');
 
 // A run that died halfway would stay "running" forever: mark it failed so the source can back off.
 Schedule::command('runs:cleanup')->everyTenMinutes();
+
+// What goes with each qualification, recounted from the vacancies (after the 04:00 status sweep).
+Schedule::command('stats:rebuild')->dailyAt('04:30');
