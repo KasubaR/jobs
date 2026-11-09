@@ -30,7 +30,7 @@ class DefaultRules
             ['field' => 'employer', 'pattern' => '(?:employer|company|organi[sz]ation|hiring organi[sz]ation)'.$s.'([^\n]{2,100})'],
             ['field' => 'qualification_text', 'pattern' => '(?:minimum qualifications?|qualifications?|educational requirements?|education)'.$s.'([^\n]{2,150})'],
             // No label: a requirements bullet that opens with the qualification itself ("Diploma or degree in Accounting...").
-            ['field' => 'qualification_text', 'pattern' => '(?:^|\n)[ \t]*(?:[*•·\-–]\s*)?((?:(?:an?|the)\s+)?(?:advanced\s+diploma|higher national diploma|post-?graduate|diploma|degree|bachelor|master|phd|doctorate|mba|bsc|beng|llb|hnd|certificate)\b[^\n]{4,200})'],
+            ['field' => 'qualification_text', 'pattern' => '(?:^|\n)[ \t]*(?:(?:[*•·\-–]|\d{1,2}[.)])\s*)?((?:(?:an?|the)\s+)?(?:advanced\s+diploma|higher national diploma|post-?graduate|diploma|degree|bachelor|master|phd|doctorate|mba|bsc|beng|llb|hnd|certificate)\b[^\n]{4,200})'],
             ['field' => 'experience_text', 'pattern' => '(?:work experience|experience)'.$s.'([^\n]{2,100})'],
             ['field' => 'experience_text', 'pattern' => '(\d{1,2}\s*(?:\+|-\s*\d{1,2}|to\s+\d{1,2})?\s*(?:years?|yrs?)\'?\s+(?:of\s+)?(?:relevant\s+|working\s+|work\s+)?experience)'],
             ['field' => 'application_url', 'pattern' => '(?:apply online|apply (?:at|here|via|through|on)|application link|how to apply)'.$s.'?(https?://[^\s<>"\']+)'],

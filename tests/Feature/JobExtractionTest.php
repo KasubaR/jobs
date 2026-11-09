@@ -134,6 +134,17 @@ class JobExtractionTest extends TestCase
         $this->assertSame('rule', $job->field_sources['qualification_text']);
     }
 
+    public function test_a_numbered_requirements_list_gives_the_degree_not_the_school_certificate(): void
+    {
+        $post = $this->ad(['raw_content' => '<p><strong>Qualifications and Experience</strong></p><p>1. School Certificate with credit and above in Mathematics and English<br />'
+            ."
+".'2. Bachelor’s Degree in Civil Engineering, Water Engineering, Mechanical Engineering.<br />'
+            ."
+".'3. Member of the Engineering Institution of Zambia (EIZ)</p>']);
+
+        $this->assertSame('Bachelor’s Degree in Civil Engineering, Water Engineering, Mechanical Engineering.', $this->run_($post)->qualification_text);
+    }
+
     public function test_a_deadline_without_a_year_is_not_guessed(): void
     {
         $post = $this->ad(['raw_content' => 'Please apply by 30 November. Closing date: end of the month.']);
