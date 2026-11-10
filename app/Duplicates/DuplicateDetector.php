@@ -100,6 +100,22 @@ class DuplicateDetector
         $this->link(Job::findOrFail($pair->job_a_id), Job::findOrFail($pair->job_b_id), 'a person confirmed it', $mainId, 'person');
     }
 
+    /**
+     * Marks $copy as a copy of $main on a decision made outside the scoring (for example retiring a whole source), and
+     * records the pair as confirmed with the reason, so it shows in the same places as any other decision.
+     */
+    public function markCopyOf(Job $copy, Job $main, string $why, string $by = 'system'): void
+    {
+        [$lo, $hi] = $copy->id < $main->id ? [$copy->id, $main->id] : [$main->id, $copy->id];
+        $now = now();
+        DB::table('job_duplicate_candidates')->updateOrInsert(['job_a_id' => $lo, 'job_b_id' => $hi], [
+            'score' => 100, 'reason' => 'score', 'breakdown' => json_encode(['decision' => $why]),
+            'outcome' => 'confirmed', 'decided_by' => $by, 'decided_at' => $now, 'created_at' => $now, 'updated_at' => $now,
+        ]);
+
+        $this->link($copy, $main, $why, $main->id, $by);
+    }
+
     /** A person says these two are different vacancies. They are not proposed again; a link between them is undone. */
     public function reject(object $pair): void
     {
