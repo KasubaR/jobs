@@ -195,7 +195,9 @@ class ExtractedItemsSchemaTest extends TestCase
     {
         $this->job->qualifications()->create(['education_level' => 'bachelor']);
 
-        Artisan::call('migrate:rollback', ['--step' => 5]);   // provenance, the link stats, the fold, the directory tables, then this migration
+        // this migration and every later one, however many have been added since
+        $steps = 1 + DB::table('migrations')->where('migration', '>', '2026_11_09_000003_add_extracted_items_to_jobs')->count();
+        Artisan::call('migrate:rollback', ['--step' => $steps]);
         $this->assertFalse(Schema::hasColumn('jobs', 'analysis_status'));
         $this->assertFalse(Schema::hasColumn('job_skills', 'requirement_level'));
         $this->assertFalse(Schema::hasColumn('job_qualifications', 'academic_award_id'));

@@ -71,4 +71,24 @@ return [
 
     // Refuse feeds bigger than this many bytes.
     'max_response_bytes' => 5 * 1024 * 1024,
+
+    // Optional AI help for reading ads. Off unless AI_EXTRACTION_ENABLED=true. The key lives only in .env.
+    // Prices change, so they are settings (US dollars per million tokens), not code; with none set, tokens are
+    // recorded and the cost is left blank.
+    'ai' => [
+        'enabled' => (bool) env('AI_EXTRACTION_ENABLED', false),
+        'provider' => env('AI_PROVIDER', 'gemini'),
+        'timeout' => (int) env('AI_TIMEOUT_SECONDS', 30),
+        'max_attempts' => (int) env('AI_MAX_ATTEMPTS', 3),
+        'max_input_chars' => (int) env('AI_MAX_INPUT_CHARS', 12000),
+        'daily_call_limit' => (int) env('AI_DAILY_CALL_LIMIT', 200),
+        'daily_budget_usd' => (float) env('AI_DAILY_BUDGET_USD', 1.0),
+        'price_input_per_million' => (float) env('AI_PRICE_INPUT_PER_MILLION', 0),
+        'price_output_per_million' => (float) env('AI_PRICE_OUTPUT_PER_MILLION', 0),
+        'gemini' => [
+            'key' => env('GEMINI_API_KEY'),
+            'model' => env('GEMINI_MODEL'),
+            'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+        ],
+    ],
 ];

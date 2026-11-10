@@ -21,6 +21,12 @@ class AppServiceProvider extends ServiceProvider
 
         // The taxonomy (skills, qualifications, fields, occupations, industries), read once and shared.
         $this->app->scoped(\App\Taxonomy\TaxonomyIndex::class);
+
+        // The AI service behind one interface; AI_PROVIDER picks it, so a provider can be added or swapped without touching the callers.
+        $this->app->bind(\App\Ai\AiProvider::class, fn () => match (config('job_intel.ai.provider')) {
+            'gemini' => new \App\Ai\GeminiProvider,
+            default => throw new \InvalidArgumentException('Unknown AI_PROVIDER "'.config('job_intel.ai.provider').'". Supported: gemini.'),
+        });
     }
 
     public function boot(): void
