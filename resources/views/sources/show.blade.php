@@ -70,6 +70,7 @@
         @endif
       </dd>
       <dt>Raw ad text</dt><dd>{{ $source->retain_raw ? 'Kept for 90 days' : 'Not kept' }}</dd>
+      <dt>AI reading</dt><dd>{{ $source->ai_allowed ? 'Allowed' : 'Not allowed' }}</dd>
       <dt>Access decided</dt><dd>{{ $source->access_decided_at?->format('j M Y H:i') ?? 'not yet' }}@if ($source->access_decision_note) <div class="mut">{{ $source->access_decision_note }}</div>@endif</dd>
       <dt>Notes</dt><dd>{{ $source->notes ?: 'none' }}</dd>
     </dl>

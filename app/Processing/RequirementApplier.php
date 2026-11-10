@@ -94,7 +94,7 @@ class RequirementApplier
     }
 
     /** The key a stored qualification row has, in the same shape as the reader's key for the same item. */
-    private function qualificationKey(object $r): string
+    public function qualificationKey(object $r): string
     {
         $named = match (true) {
             $r->academic_award_id !== null => 'award:'.DB::table('academic_awards')->where('id', $r->academic_award_id)->value('key'),
@@ -106,7 +106,7 @@ class RequirementApplier
         return implode('|', [$named, $r->education_level ?? '', $r->field_id ?? '', mb_strtolower((string) $r->candidate_text)]);
     }
 
-    private function directoryId(array $r): ?int
+    public function directoryId(array $r): ?int
     {
         [$table, $key] = match (true) {
             isset($r['academic_award_id']) => ['academic_awards', $r['named_key']],

@@ -15,9 +15,6 @@ class AuditBaselineCommand extends Command
 
     protected $description = 'Report what is stored, how qualifications are read, and which vacancies have none (changes nothing)';
 
-    /** Words that suggest an ad states an academic or professional requirement. */
-    private const HINT = '/\b(degree|diploma|bachelor|b\.?sc|b\.?com|b\.?a\b|master|mba|phd|certificate|grade\s*12|o[- ]?level|a[- ]?level|qualification|acca|cima|zica|cpa|licen[cs]e|trade test|apprentice|graduate)\b/iu';
-
     /** Fewer characters than this of ad text is too little to hold requirements. */
     private const THIN = 300;
 
@@ -88,7 +85,7 @@ class AuditBaselineCommand extends Command
                     ! in_array($r->analysis_status, ['done', 'needs_review'], true) && $r->raw_content !== null => 'not analysed yet',
                     $r->raw_content === null => 'no ad text kept',
                     $n < self::THIN => 'ad text too short',
-                    preg_match(self::HINT, strip_tags($r->raw_content)) === 1 => 'ad names a qualification the reader missed',
+                    preg_match(\App\Ai\Extraction\AiEligibility::HINT, strip_tags($r->raw_content)) === 1 => 'ad names a qualification the reader missed',
                     default => 'ad appears to state none',
                 };
                 $reasons[$reason]++;

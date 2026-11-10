@@ -37,6 +37,7 @@ class SourceRequest extends FormRequest
             'collection_frequency' => ['required', Rule::in(array_keys(Source::FREQUENCIES))],
             'min_interval_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
             'retain_raw' => ['sometimes', 'boolean'],
+            'ai_allowed' => ['sometimes', 'boolean'],
             'lists_all_open_ads' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
@@ -102,6 +103,7 @@ class SourceRequest extends FormRequest
             'collection_frequency' => $data['collection_frequency'],
             'min_interval_seconds' => (int) $data['min_interval_seconds'],
             'retain_raw' => $this->boolean('retain_raw'),
+            'ai_allowed' => $this->boolean('ai_allowed'),
             'lists_all_open_ads' => $this->boolean('lists_all_open_ads'),
             'notes' => $data['notes'] ?? null,
             'collector_config' => SourceFormData::config($this->all(), $data['collector'] ?? null),
