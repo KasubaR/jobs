@@ -129,6 +129,7 @@ class AiExtractionServiceTest extends TestCase
         $this->assertStringContainsString('AI read: 3 added', $this->logs($job));
         $usage = DB::table('ai_usage')->sole();
         $this->assertSame(['extract', 'ok', $job->id], [$usage->purpose, $usage->status, (int) $usage->job_id]);
+        $this->assertSame(\App\Ai\Extraction\QualificationSchema::PROMPT_VERSION, (int) $usage->prompt_version);   // the answer is tied to the wording that produced it
     }
 
     public function test_the_request_carries_the_rules_and_the_fenced_ad_and_nothing_else_of_the_job(): void

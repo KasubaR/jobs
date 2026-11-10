@@ -21,9 +21,9 @@ class QualificationExtractor
      *
      * @throws AiFailure when the request could not be made or completed
      */
-    public function extract(string $adText, ?int $jobId = null): ValidatedExtraction
+    public function extract(string $adText, ?int $jobId = null, string $purpose = 'extract'): ValidatedExtraction
     {
-        $reply = $this->ai->ask(QualificationSchema::instructions(), QualificationSchema::prompt($adText), 'extract', $jobId);
+        $reply = $this->ai->ask(QualificationSchema::instructions(), QualificationSchema::prompt($adText), $purpose, $jobId, promptVersion: QualificationSchema::PROMPT_VERSION);
 
         $data = $reply->json();
 

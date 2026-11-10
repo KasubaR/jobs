@@ -248,6 +248,18 @@ class AiClientTest extends TestCase
         $this->assertSame('blocked', DB::table('ai_usage')->value('status'));
     }
 
+    public function test_the_size_limit_is_on_the_advert_not_on_the_fixed_instructions(): void
+    {
+        Http::fake([self::URL => $this->answer()]);
+        config(['job_intel.ai.max_input_chars' => 100]);
+
+        // 300 characters of instructions plus a 60-character advert: the advert is under the limit, the total is not
+        $this->client()->ask(str_repeat('i', 300), str_repeat('x', 60), 'test');
+
+        Http::assertSentCount(1);
+        $this->assertSame(360, (int) DB::table('ai_usage')->value('input_chars'));   // the whole request is still what is recorded
+    }
+
     public function test_the_daily_call_limit_stops_further_calls(): void
     {
         Http::fake([self::URL => $this->answer()]);

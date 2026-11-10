@@ -17,6 +17,9 @@ use Illuminate\Support\Sleep;
  */
 class AiClient
 {
+    /** The prompt wording of the request being made, recorded with its usage row. */
+    private ?int $promptVersion = null;
+
     public function __construct(private AiProvider $provider) {}
 
     public function enabled(): bool
@@ -35,14 +38,17 @@ class AiClient
     }
 
     /** @throws AiFailure */
-    public function ask(string $system, string $prompt, string $purpose, ?int $jobId = null, bool $json = true): AiResponse
+    public function ask(string $system, string $prompt, string $purpose, ?int $jobId = null, bool $json = true, ?int $promptVersion = null): AiResponse
     {
+        $this->promptVersion = $promptVersion;
+
         if ($reason = $this->unavailable()) {
             throw new AiFailure($reason, kind: 'off');
         }
 
         $size = mb_strlen($system) + mb_strlen($prompt);
-        if ($size > (int) config('job_intel.ai.max_input_chars')) {
+        // The limit is on the text being read (the message), not on the fixed instructions sent with every request.
+        if (mb_strlen($prompt) > (int) config('job_intel.ai.max_input_chars')) {
             $this->refuse($purpose, $size, $jobId, 'Text longer than AI_MAX_INPUT_CHARS.');
         }
         if ($reason = $this->limitReached()) {
@@ -125,7 +131,7 @@ class AiClient
             ? round(($in * $inPrice + $out * $outPrice) / 1_000_000, 6) : null;
 
         DB::table('ai_usage')->insert([
-            'provider' => $this->provider->name(), 'model' => $this->provider->model(), 'purpose' => mb_substr($purpose, 0, 40),
+            'provider' => $this->provider->name(), 'model' => $this->provider->model(), 'purpose' => mb_substr($purpose, 0, 40), 'prompt_version' => $this->promptVersion,
             'status' => $status, 'attempts' => $attempts, 'http_status' => $http, 'input_chars' => $size,
             'input_tokens' => $in, 'output_tokens' => $out, 'cost_usd' => $cost,
             'duration_ms' => (int) round((microtime(true) - $started) * 1000),

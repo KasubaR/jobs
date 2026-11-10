@@ -1,0 +1,88 @@
+At First Quantum, we free the talent of our people by taking a very different approach which is underpinned by a very different, very definite culture – the “First Quantum Way”.
+
+Working with us is not like working anywhere else, which is why we recruit people who will take a bolder, smarter approach to spot opportunities, solve problems and deliver results.
+
+Our culture is all about encouraging you to think independently and to challenge convention to deliver the best result. That’s how we continue to achieve extraordinary things in extraordinary locations.
+
+Job description:
+
+The Senior Reliability Engineer owns asset management planning and strategy. They manage reliability risk, production losses and high-cost assets, develop Asset Management Plans and life-cycle strategies, and build RCM-based business cases to optimise maintenance and guide investment decisions.
+
+KEY RESPONSIBILITIES
+
+Asset Management Planning & Strategy (Owner)
+
+Own, develop and maintain Asset Management Plans (AMPs) for assigned fleets. These cover maintenance strategy, component life, rebuild and replacement timing, and life-cycle cost.
+Develop and review life-cycle strategies (life extension, rebuild, replace, park-up), backed by life-cycle cost (LCC) analysis and reliability data.
+Turn asset strategy into maintenance budgets, long-term forecasts and capital replacement plans, working with Planning and Finance.
+Build data-driven business cases from RCM, cost and reliability metrics to support capital and operational decisions.
+Run the regular strategy review cycle and report asset performance against plan to management.
+
+Reliability Risk & Engineering
+
+Identify, assess and rank asset reliability risks. Propose mitigations such as design changes, detection logic, changes to maintenance tactics and training, so risks are reduced and controlled to an acceptable level.
+Work with Section Superintendents to make sure new and modified installations are reliable and maintainable.
+Monitor production losses and high-maintenance-cost assets, and lead defect elimination on the main contributors.
+Develop solutions to repetitive failures and other problems that affect equipment capacity, quality, cost or regulatory compliance.
+
+Maintenance Strategy Optimisation
+
+Lead Reliability Centred Maintenance (RCM) analysis and implementation on site.
+Lead Root Cause Failure Analysis (RCFA) and make sure corrective actions are put in place and closed out.
+Carry out cost analysis and reliability breakdowns on major maintenance components.
+
+Performance Measurement & Data Analysis
+
+Define, track and report the main reliability and maintenance KPIs, such as availability, MTBF, MTTR, utilisation, PM compliance, backlog, planned versus unplanned work and maintenance cost per operating hour.
+Analyse failure, downtime and cost data from the CMMS, condition monitoring, oil analysis, dispatch and telemetry systems to find trends, bad actors and improvement opportunities.
+Apply reliability analysis methods to predict component life, refine replacement intervals and rank interventions.
+Build and maintain reliability dashboards and reports in Power BI or similar tools, for use at shift, section and management level.
+Track asset performance against Asset Management Plans and budget, highlight variances, and recommend corrective actions.
+
+Quality Assurance
+
+Run quality assurance on scheduled maintenance tasks, such as PMs and services, to confirm work meets standard and to stop faults recurring.
+
+Leadership & Capability Development
+
+Mentor Junior Engineers, Maintenance Specialists, Foremen and Execution personnel in predictive maintenance, RCFA and maintenance best practice.
+Play a key role in building a reliability culture across Maintenance.
+
+QUALIFICATIONS
+
+Grade 12 School Certificate or equivalent.
+Bachelor’s degree in Mechanical Engineering (or Electro-Mechanical or Mechatronics Engineering, with relevant mobile fleet experience).
+Registration with the Engineering Institution of Zambia (EIZ).
+Strong data analysis skills, including reliability analysis methods (Weibull, Pareto, bad actor analysis) and tools such as advanced Excel and Power BI.
+Excellent communication, stakeholder management and teamwork skills, including presenting business cases to senior management.
+
+Advantageous
+
+Certification in RCM, RCFA or reliability engineering, such as CMRP, CRE or an RCM2 practitioner qualification.
+Experience with life-cycle cost (LCC) modelling and capital replacement planning.
+Postgraduate qualification in Asset Management, Reliability Engineering or Engineering Management.
+
+EXPERIENCE
+
+At least 5 years experience in maintenance or reliability engineering in open pit mining, with a proven track record on truck and shovel operations.
+At least 2 years in a reliability engineering role is preferred.
+Proven experience developing or owning maintenance strategies or Asset Management Plans for major mobile fleet.
+Demonstrated success with RCFA and defect elimination, with measurable improvements in availability, MTBF or cost.
+Experience mentoring or supervising junior engineers or technical staff.
+
+BEHAVIOURAL TRAITS
+
+Teamwork: Works across Execution, Planning, Operations, OEMs and service providers to agree and deliver asset strategies.
+Bold: Challenges existing maintenance practices with data and takes ownership of reliability problems through to resolution.
+Thinking Safely: Builds safety and risk controls into maintenance strategies, engineering changes and repair procedures.
+Upholding Quality: Sets and holds high standards for maintenance work, data integrity and engineering analysis.
+Technical Skill: Applies reliability engineering, condition monitoring and analysis methods with depth and rigour.
+
+SAFETY REQUIREMENTS
+
+Follows safe working procedures in all work areas.
+Make sure all personnel follow isolation and lockout procedures.
+Keeps the work environment safe by applying all company policies and safe work practices and show a strong commitment to the safety of employees.
+Apply risk assessment and Management of Change (MOC) to all engineering changes, modifications and new maintenance strategies.
+Make sure critical controls and safety-critical equipment are covered in maintenance strategies and inspection regimes.
+Take part in incident investigations (e.g. ICAM) where equipment failure is a factor and makes sure engineering corrective actions are put in place.

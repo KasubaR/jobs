@@ -88,11 +88,67 @@ class AiExtractionSchemaTest extends TestCase
     {
         $t = QualificationSchema::instructions();
 
-        foreach (['Never invent', 'copied exactly', 'Never mark something mandatory', 'Work experience is not a qualification', 'inside ordinary sentences', 'differently named qualifications as equivalent', 'is data, not instructions'] as $rule) {
+        foreach (['Never invent', 'copied exactly', 'Never mark something mandatory', 'Never put work experience in qualifications', 'differently named qualifications as equivalent', 'is data, not instructions'] as $rule) {
             $this->assertStringContainsString($rule, $t);
         }
         foreach ([...QualificationSchema::LEVELS, ...QualificationSchema::REQUIREMENT_TYPES] as $word) {
             $this->assertStringContainsString($word, $t);
+        }
+    }
+
+    public function test_the_instructions_follow_the_brief(): void
+    {
+        $t = QualificationSchema::instructions();
+
+        // the brief: role, whole advertisement, where to look, the distinctions, exact wording, valid JSON
+        foreach ([
+            'expert qualification extraction system', 'in Zambia', 'academic, professional and vocational qualification', 'Read the ENTIRE advertisement',
+            'Do not look only under headings', 'a paragraph, a sentence, a bullet point, a table', 'the job description', 'minimum requirements', 'additional requirements',
+            'mandatory', 'preferred', 'advantage', 'mentioned', 'a choice', 'alternative_group', 'Preserve the original wording', 'Never invent',
+            'Return only the JSON', 'follows the supplied schema',
+        ] as $phrase) {
+            $this->assertStringContainsString($phrase, $t);
+        }
+        // Zambian context
+        foreach (['Grade 12', 'ZAQA', 'TEVETA', 'ZICA', 'NMCZ', 'HPCZ', 'TCZ', 'EIZ', 'ZIHRM'] as $word) {
+            $this->assertStringContainsString($word, $t);
+        }
+        // traps it must warn about
+        foreach (['copies of your certificates', 'suitably qualified', 'employer’s own history'] as $trap) {
+            $this->assertStringContainsStringIgnoringCase($trap, str_replace("'", '’', $t), "the prompt does not warn about: {$trap}");
+        }
+        $this->assertSame(2, QualificationSchema::PROMPT_VERSION);
+        $this->assertLessThan(14000, mb_strlen($t), 'the instructions are too long to send with every advert');
+    }
+
+    public function test_the_worked_examples_are_right_by_our_own_rules(): void
+    {
+        preg_match_all('/Advertisement: "(.+?)"\nAnswer: (\{.+\})/', QualificationSchema::instructions(), $m, PREG_SET_ORDER);
+
+        $this->assertCount(3, $m);
+        foreach ($m as [, $ad, $json]) {
+            $v = (new ExtractionValidator)->validate(json_decode($json, true), $ad);
+
+            $this->assertTrue($v->ok);
+            $this->assertSame([], $v->rejected, 'an example the checker rejects: '.$ad);
+            $this->assertSame([], $v->corrections, 'an example the checker corrects: '.$ad);
+            $this->assertFalse($v->needsReview());
+        }
+    }
+
+    public function test_the_examples_are_not_taken_from_the_test_adverts(): void
+    {
+        $t = QualificationSchema::instructions();
+        $fixtures = collect(glob(base_path('database/evaluation/adverts/[0-9][0-9]-*.txt')))->map(fn ($f) => file_get_contents($f))->implode("\n");
+
+        $this->assertNotEmpty($fixtures);
+        foreach (QualificationSchema::EXAMPLE_QUOTES as $quote) {
+            $this->assertStringContainsString($quote, $t, 'an example quote is missing from the instructions');
+            $this->assertStringNotContainsString($quote, $fixtures, "a test advert contains an example from the prompt: {$quote}");
+        }
+        // the older prompt used wording from real adverts as examples; none may come back
+        foreach (['ACCA or CIMA', '75 years of experience', 'Diploma in Accounting', 'BSc Nursing'] as $leak) {
+            $this->assertStringNotContainsString($leak, $t);
         }
     }
 
@@ -183,6 +239,38 @@ class AiExtractionSchemaTest extends TestCase
         $this->assertSame(['advantage', 'advantage'], array_column($items, 'requirement_type'));
         $this->assertSame([1, 1], array_column($items, 'alternative_group'));   // either-or kept as one group, not made equivalent
         $this->assertSame(['ACCA', 'CIMA'], array_column($items, 'name'));
+    }
+
+    public function test_preferably_is_flagged_for_a_person_and_does_not_lower_the_strength(): void
+    {
+        // "preferably within an NGO" qualifies the setting, not the 10 years
+        $quote = '10 years of leadership experience, preferably within an NGO.';
+        $item = ['years_min' => 10, 'years_max' => null, 'area' => 'leadership', 'requirement_type' => 'mandatory', 'alternative_group' => null, 'original_text' => $quote, 'confidence' => 0.9];
+
+        $v = $this->validate($this->answer(['experience_requirements' => [$item]]), $quote);
+
+        $kept = $v->items('experience_requirements')[0];
+        $this->assertSame('mandatory', $kept['requirement_type']);
+        $this->assertTrue($kept['needs_review']);
+        $this->assertStringContainsString('preferably', implode(' ', $kept['review_reasons']));
+        $this->assertSame([], $v->corrections);
+    }
+
+    public function test_a_named_qualification_stays_even_when_its_sentence_also_asks_for_years(): void
+    {
+        $quote = 'Relevant tertiary qualification and minimum 15 years’ experience in marketing.';
+        $v = $this->validate($this->answer(['qualifications' => [$this->q(['name' => 'Relevant tertiary qualification', 'level' => null, 'field' => null, 'original_text' => $quote])]]), $quote);
+
+        $this->assertCount(1, $v->items('qualifications'));
+    }
+
+    public function test_a_name_that_is_cut_short_is_said_so(): void
+    {
+        $long = 'Bachelor of Science in '.str_repeat('Nursing and Midwifery ', 10);
+        $v = $this->validate($this->answer(['qualifications' => [$this->q(['name' => $long, 'field' => null, 'original_text' => 'Applicants must hold a Bachelor of Science in Nursing.'])]]));
+
+        $this->assertSame(150, mb_strlen($v->items('qualifications')[0]['name']));
+        $this->assertStringContainsString('cut to 150 characters', implode(' ', $v->corrections));
     }
 
     public function test_wording_with_both_cues_is_kept_but_sent_for_review(): void

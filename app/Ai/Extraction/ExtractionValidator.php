@@ -36,7 +36,10 @@ class ExtractionValidator
 
     private const STRONG_CUE = '/\b(must|required|requires?|essential|mandatory|minimum|should (?:hold|have|possess)|need(?:s)? to (?:have|hold)|compulsory)\b/i';
 
-    private const WEAK_CUE = '/\b(preferred|preferably|desirable|desired|ideally|added advantage|an advantage|is an asset|an asset|would be considered|will be considered|beneficial|a plus)\b/i';
+    private const WEAK_CUE = '/\b(preferred|desirable|desired|added advantage|an advantage|is an asset|an asset|would be considered|will be considered|beneficial|a plus)\b/i';
+
+    /** "preferably within an NGO" often qualifies only part of the sentence ("10 years ... preferably within an NGO"), so it is flagged for a person, not used to lower the strength. */
+    private const SOFT_CUE = '/\b(preferably|ideally)\b/i';
 
     private const NUMBER_WORDS = ['one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5, 'six' => 6, 'seven' => 7, 'eight' => 8, 'nine' => 9, 'ten' => 10, 'twelve' => 12, 'fifteen' => 15, 'twenty' => 20];
 
@@ -133,6 +136,9 @@ class ExtractionValidator
         } elseif ($type === 'mandatory' && $weak && $strong) {
             $review[] = 'The wording has both a "required" and a "preferred" cue.';
         }
+        if ($type === 'mandatory' && ! $weak && preg_match(self::SOFT_CUE, $quote, $soft) === 1) {
+            $review[] = "The wording has \"{$soft[0]}\", which may apply to only part of the sentence.";
+        }
         if ($confidence < self::MIN_CONFIDENCE) {
             $review[] = 'Low confidence.';
         }
@@ -173,7 +179,8 @@ class ExtractionValidator
 
         // Rule: work experience is not a qualification.
         $asksYears = preg_match('/\b(\d+|'.implode('|', array_keys(self::NUMBER_WORDS)).')\s*\+?\s*(?:\(\d+\)\s*)?(?:years?|yrs?)\b/i', $quote) === 1;
-        $namesAward = preg_match('/\b(degree|diploma|certificate|bachelor|master|doctorate|phd|b\.?sc|b\.?a|b\.?com|beng|mba|licen[cs]e|trade test|a-level|o-level|grade\s*\d+|national|advanced|higher)\b/i', $name.' '.$quote) === 1;
+        // Judged by the NAME: a name that is an award stays even when its sentence also asks for years ("A diploma ... with 3 years").
+        $namesAward = preg_match('/\b(qualifications?|tertiary|degree|diploma|certificat(?:e|ion)|training|bachelor|master|doctorate|phd|b\.?sc|b\.?a|b\.?com|beng|mba|licen[cs]e|trade test|a-level|o-level|grade\s*\d+|national|advanced|higher|chartered|accredited)\b/i', $name) === 1;
         if (preg_match('/\bexperience\b/i', $name) || ($level === null && $field === null && $asksYears && ! $namesAward)) {
             return $this->reject($section, 'This is work experience, not a qualification.', $in);
         }
@@ -261,7 +268,14 @@ class ExtractionValidator
 
     private function text(mixed $v, int $max): ?string
     {
-        return is_string($v) && trim($v) !== '' ? mb_substr(trim($v), 0, $max) : null;
+        if (! is_string($v) || trim($v) === '') {
+            return null;
+        }
+        if (mb_strlen(trim($v)) > $max) {
+            $this->corrections[] = "A name was cut to {$max} characters: \"".mb_substr(trim($v), 0, 40).'…"';
+        }
+
+        return mb_substr(trim($v), 0, $max);
     }
 
     private function type(mixed $v): ?string
