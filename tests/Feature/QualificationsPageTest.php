@@ -114,9 +114,9 @@ class QualificationsPageTest extends TestCase
         $r = $this->page()->assertOk();
 
         $labels = $r->viewData('labels')->pluck('n', 'name')->all();
-        $this->assertSame(2, $labels['Degree in Procurement']);
+        $this->assertSame(2, $labels["Bachelor's Degree in Procurement"]);
         foreach (['Supply Chain Management', 'Banking & Finance', 'Law', 'Engineering'] as $subject) {
-            $this->assertSame(1, $labels["Degree in {$subject}"], $subject);
+            $this->assertSame(1, $labels["Bachelor's Degree in {$subject}"], $subject);
         }
         $this->assertSame(2, $r->viewData('fields')->pluck('n', 'name')->all()['Procurement']);
         $this->assertSame(2, $r->viewData('labelsNamed'));

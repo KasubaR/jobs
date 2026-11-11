@@ -36,8 +36,8 @@ class GeminiProvider implements AiProvider
         try {
             $response = Http::withHeaders(['x-goog-api-key' => (string) config('job_intel.ai.gemini.key')])
                 ->timeout((int) config('job_intel.ai.timeout'))->acceptJson()->asJson()->post($url, $body);
-        } catch (ConnectionException) {
-            throw new AiFailure('The AI service did not answer in time or could not be reached.', retryable: true, kind: 'error');
+        } catch (ConnectionException $e) {
+            throw new AiFailure('The AI service did not answer in time or could not be reached ('.$this->why($e).').', retryable: true, kind: 'error');
         }
 
         $status = $response->status();
@@ -66,6 +66,19 @@ class GeminiProvider implements AiProvider
         }
 
         return new AiResponse($text, $this->count($response->json('usageMetadata.promptTokenCount')), $this->count($response->json('usageMetadata.candidatesTokenCount')));
+    }
+
+    /**
+     * The network error in short ("cURL error 28: Operation timed out after 30001 milliseconds"), so a failure can be told
+     * apart from another. The key travels in a header, so it is not in this text; any key-like string is removed anyway.
+     */
+    private function why(ConnectionException $e): string
+    {
+        $text = preg_replace('/\s*\(see https?:\/\/\S+\)/', '', $e->getMessage());
+        $text = preg_replace('/(key=|AIza)[A-Za-z0-9_\-]+/', '$1…', (string) $text);
+        $text = preg_replace('/\s+for https?:\/\/\S+$/', '', (string) $text);
+
+        return mb_substr(trim((string) $text), 0, 160);
     }
 
     private function count(mixed $value): ?int

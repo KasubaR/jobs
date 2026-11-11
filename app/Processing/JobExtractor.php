@@ -70,7 +70,7 @@ class JobExtractor
         $set('location_text', $this->location($facts), $this->clean($text['location'] ?? null, 255));
         $set('employment_type', $this->clean($this->listText($facts['employment_type'] ?? null), 30), $this->clean($text['employment_type'] ?? null, 30));
         $set('qualification_text', $this->clean($this->listText($facts['education'] ?? $facts['qualifications'] ?? null), 255), $this->clean($text['qualification_text'] ?? null, 255));
-        $set('experience_text', $this->clean($this->listText($facts['experience'] ?? null), 255), $this->clean($text['experience_text'] ?? null, 255));
+        $set('experience_text', $this->clean($this->listText($facts['experience'] ?? null), 255), $this->notAQualification($this->clean($text['experience_text'] ?? null, 255)));
         $set('application_url', $this->url($facts['application_url'] ?? $facts['apply_url'] ?? null), $this->url($text['application_url'] ?? null));
         $set('closing_date', $this->date($facts['valid_through'] ?? $facts['closing_date'] ?? $facts['deadline'] ?? null, $formats), $this->date($text['closing_date'] ?? null, $formats));
         $set('posted_date', $this->date($facts['date_posted'] ?? $facts['posted_date'] ?? null, $formats), $this->date($text['posted_date'] ?? null, $formats));
@@ -161,6 +161,22 @@ class JobExtractor
     }
 
     /** Plain text, spaces collapsed, cut to the column length. */
+    /**
+     * "Qualifications and Experience: Full Grade 12 Certificate…" puts a qualification after the word "experience".
+     * Text that names an award and gives no length of time is not experience, so it is not offered as experience.
+     */
+    private function notAQualification(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $award = preg_match('/\b(?:grade\s+(?:12|twelve)|school certificate|certificate|diploma|degree|bachelor|master|phd|doctorate|hnd)\b/i', $value) === 1;
+        // a length of time ("3 years", "two (2) yrs"), not just any number ("Grade 12", "5 Credits")
+        $length = preg_match('/\b(?:years?|yrs?|months?)\b/i', $value) === 1;
+
+        return $award && ! $length ? null : $value;
+    }
+
     private function clean(mixed $value, int $max): ?string
     {
         if (! is_string($value) && ! is_numeric($value)) {

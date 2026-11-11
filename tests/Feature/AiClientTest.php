@@ -193,6 +193,18 @@ class AiClientTest extends TestCase
         $this->assertSame(3, (int) DB::table('ai_usage')->value('attempts'));
     }
 
+    public function test_a_network_failure_says_why_without_the_key_or_the_address(): void
+    {
+        Http::fake([self::URL => fn () => throw new ConnectionException('cURL error 28: Operation timed out after 30001 milliseconds with 0 bytes received (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for https://generativelanguage.googleapis.com/v1beta/models/test-model:generateContent?key='.self::KEY)]);
+
+        $e = $this->fails(fn () => $this->ask());
+
+        $this->assertStringContainsString('cURL error 28: Operation timed out after 30001 milliseconds', $e->getMessage());
+        $this->assertStringNotContainsString(self::KEY, $e->getMessage());
+        $this->assertStringNotContainsString('curl.haxx.se', $e->getMessage());
+        $this->assertStringNotContainsString(self::KEY, json_encode(DB::table('ai_usage')->get()));
+    }
+
     public function test_a_refused_key_is_not_retried_and_the_message_does_not_contain_the_key(): void
     {
         Http::fake([self::URL => Http::response(['error' => ['message' => 'API key not valid: '.self::KEY]], 403)]);

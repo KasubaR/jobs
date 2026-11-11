@@ -176,6 +176,13 @@ class JobExtractionTest extends TestCase
         $this->assertSame('3 years experience', $this->run_($post)->experience_text);
     }
 
+    public function test_a_qualification_after_the_word_experience_is_not_taken_as_experience(): void
+    {
+        $post = $this->ad(['raw_content' => "Qualifications and Experience - Full Grade 12 Certificate with 5 Credits including English & Mathematics.\nBe a team player."]);
+
+        $this->assertNull($this->run_($post)->experience_text);
+    }
+
     // ---- source rules ----
 
     public function test_the_title_is_split_when_the_source_names_a_separator(): void

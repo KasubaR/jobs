@@ -43,14 +43,19 @@ class QualificationController extends Controller
         $experienceRead = $base()->whereNotNull('experience_label')->count();
 
         $levels = $base()->whereNotNull('qualification_level')
-            ->selectRaw('qualification_level as k, qualification_rank as r, count(*) as n')->groupBy('qualification_level', 'qualification_rank')->orderByDesc('n')->get();
+            ->selectRaw('qualification_level as k, count(*) as n')->groupBy('qualification_level')->get()
+            // "Degree" and "Bachelor's Degree" are the same rung: an ad that says only "degree" means a first degree
+            ->groupBy(fn ($l) => $l->k === 'degree' ? 'bachelor' : $l->k)
+            ->map(fn ($rows, $k) => ['name' => DefaultTerms::LEVELS[$k][0] ?? ucfirst((string) $k), 'n' => (int) $rows->sum('n')])
+            ->sortByDesc('n')->values();
 
         // "Degree in Law, Procurement, Engineering" asks for three different qualifications: each counts once for that vacancy
         $withField = $base()->whereNotNull('qualification_field')->get(['qualification_level', 'qualification_field']);
         $labelCounts = [];
         $fieldCounts = [];
         foreach ($withField as $job) {
-            $level = DefaultTerms::LEVELS[$job->qualification_level][0] ?? ucfirst((string) $job->qualification_level);
+            $levelKey = $job->qualification_level === 'degree' ? 'bachelor' : $job->qualification_level;
+            $level = DefaultTerms::LEVELS[$levelKey][0] ?? ucfirst((string) $levelKey);
             foreach ($this->subjects($job->qualification_field) as $subject) {
                 $fieldCounts[$subject] = ($fieldCounts[$subject] ?? 0) + 1;
                 $labelCounts["{$level} in {$subject}"] = ($labelCounts["{$level} in {$subject}"] ?? 0) + 1;
@@ -70,7 +75,7 @@ class QualificationController extends Controller
             'read' => $read,
             'notRecognised' => $notRecognised,
             'nothing' => max(0, $total - $read - $notRecognised),
-            'levels' => $levels->map(fn ($l) => ['name' => DefaultTerms::LEVELS[$l->k][0] ?? ucfirst($l->k), 'n' => (int) $l->n]),
+            'levels' => $levels,
             // only qualifications that name a subject: a bare level ("Diploma") is already in the Education level card
             'labels' => $labels,
             'labelsNamed' => $withField->count(),
