@@ -77,7 +77,8 @@ class JobController extends Controller
 
         $status->decide($job, $data['status'], trim((string) ($data['reason'] ?? '')) ?: null);
 
-        return back()->with('status', $data['status'] === 'published' ? 'Published.' : 'Rejected. It is kept, with your reason, and is not matched with other ads.');
+        // a decision finishes this ad: go back to the list for the next one
+        return redirect()->route('jobs.index')->with('status', $data['status'] === 'published' ? 'Published.' : 'Rejected. It is kept, with your reason, and is not matched with other ads.');
     }
 
     /** "I have looked at this ad and what was read is right." Moves a thin ad out of "new". */

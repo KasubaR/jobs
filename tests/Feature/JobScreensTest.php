@@ -142,7 +142,7 @@ class JobScreensTest extends TestCase
         $this->signIn();
         $job = $this->ad($this->s['company']);
 
-        $this->post("/jobs/{$job->id}/status", ['status' => 'rejected', 'reason' => 'A course advert'])->assertSessionHas('status');
+        $this->post("/jobs/{$job->id}/status", ['status' => 'rejected', 'reason' => 'A course advert'])->assertRedirect(route('jobs.index'))->assertSessionHas('status');
 
         $fresh = $job->fresh();
         $this->assertSame('rejected', $fresh->status);
