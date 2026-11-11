@@ -176,6 +176,37 @@ class JobScreensTest extends TestCase
         $this->assertSame(0, DB::table('job_status_changes')->where('job_id', $job->id)->where('changed_by', 'person')->count());
     }
 
+    public function test_several_jobs_can_be_rejected_together_and_copies_are_left_alone(): void
+    {
+        $this->signIn();
+        $a = $this->ad($this->s['company']);
+        $copy = $this->ad($this->s['boardA']);
+        $b = $this->ad($this->s['boardB'] ?? $this->s['company']);
+
+        $this->post('/jobs/decide', ['status' => 'rejected', 'reason' => 'Courses', 'jobs' => [$a->id, $copy->id]])->assertSessionHas('status');
+
+        $this->assertSame('rejected', $a->fresh()->status);
+        $this->assertSame('Courses', $a->fresh()->status_reason);
+        $this->assertSame('duplicate', $copy->fresh()->status);
+        $this->assertNotSame('rejected', $b->fresh()->status);
+    }
+
+    public function test_a_bulk_decision_needs_at_least_one_job_and_a_valid_status(): void
+    {
+        $this->signIn();
+
+        $this->post('/jobs/decide', ['status' => 'published'])->assertSessionHasErrors('jobs');
+        $this->post('/jobs/decide', ['status' => 'closed', 'jobs' => [1]])->assertSessionHasErrors('status');
+    }
+
+    public function test_the_list_has_a_tick_box_for_each_job(): void
+    {
+        $this->signIn();
+        $job = $this->ad($this->s['company']);
+
+        $this->get('/jobs')->assertOk()->assertSee('name="jobs[]" value="'.$job->id.'"', false)->assertSee('Publish ticked');
+    }
+
     public function test_a_copy_cannot_be_decided_until_it_is_separated(): void
     {
         $this->signIn();

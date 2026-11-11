@@ -10,6 +10,7 @@ use App\Standardization\DefaultTerms;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -64,6 +65,35 @@ class JobController extends Controller
             'waiting' => DB::table('unrecognized_values')->where('job_id', $job->id)->get(),
             'types' => DefaultTerms::EMPLOYMENT_TYPES,
         ]);
+    }
+
+    /** Publish or reject the ticked jobs in one go. Copies are skipped: each needs its own decision first. */
+    public function decideMany(Request $request, JobStatusService $status): RedirectResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['published', 'rejected'])],
+            'reason' => ['nullable', 'string', 'max:255'],
+            'jobs' => ['required', 'array', 'min:1', 'max:200'],
+            'jobs.*' => ['integer'],
+        ], ['jobs.required' => 'Tick at least one job first.', 'jobs.min' => 'Tick at least one job first.']);
+
+        $reason = trim((string) ($data['reason'] ?? '')) ?: null;
+        $done = 0;
+        $skipped = 0;
+        foreach (Job::whereIn('id', $data['jobs'])->get() as $job) {
+            if ($job->status === 'duplicate') {
+                $skipped++;
+
+                continue;
+            }
+            $status->decide($job, $data['status'], $reason);
+            $done++;
+        }
+
+        $message = ($data['status'] === 'published' ? 'Published ' : 'Rejected ').$done.' '.Str::plural('job', $done).'.'
+            .($skipped ? " {$skipped} marked as ".Str::plural('copy', $skipped).' of another ad '.($skipped === 1 ? 'was' : 'were').' left as '.($skipped === 1 ? 'it is' : 'they are').'.' : '');
+
+        return back()->with('status', $message);
     }
 
     /** Publish or reject by hand. The reason is kept in the history. */

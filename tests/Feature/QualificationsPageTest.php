@@ -122,6 +122,36 @@ class QualificationsPageTest extends TestCase
         $this->assertSame(2, $r->viewData('labelsNamed'));
     }
 
+    public function test_the_page_shows_five_qualifications_and_links_to_the_rest(): void
+    {
+        $this->signIn();
+        $this->vacancy('Buyer', 'Alpha Ltd', ['education' => 'Degree in Procurement, Law, Engineering, Accounting, Nursing, Agriculture']);
+
+        $r = $this->page()->assertOk();
+        $this->assertCount(5, $r->viewData('labels'));
+        $this->assertSame(6, $r->viewData('labelsTotal'));
+        $r->assertSee('View all 6')->assertSee('/qualifications/all/qualifications', false);
+        // the same six subjects are the fields of study
+        $this->assertCount(5, $r->viewData('fields'));
+        $this->assertSame(6, $r->viewData('fieldsTotal'));
+
+        $all = $this->get('/qualifications/all/qualifications')->assertOk();
+        $this->assertCount(6, $all->viewData('rows'));
+        $all->assertSee("Bachelor's Degree in Agriculture");
+        $this->assertCount(6, $this->get('/qualifications/all/fields')->assertOk()->viewData('rows'));
+        $this->get('/qualifications/all/experience')->assertOk();
+        $this->get('/qualifications/all/skills')->assertOk();
+        $this->get('/qualifications/all/nothing')->assertNotFound();
+    }
+
+    public function test_no_view_all_link_when_everything_is_already_shown(): void
+    {
+        $this->signIn();
+        $this->vacancy('Buyer', 'Alpha Ltd', ['education' => 'Degree in Procurement']);
+
+        $this->page()->assertOk()->assertDontSee('View all');
+    }
+
     public function test_a_vacancy_on_several_sites_counts_once_and_rejected_ads_not_at_all(): void
     {
         $this->signIn();

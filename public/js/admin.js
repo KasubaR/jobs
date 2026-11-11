@@ -1,3 +1,18 @@
+// tick jobs on the list: "tick all", a running count, and a question before a bulk reject
+(function () {
+  var form = document.getElementById('bulk');
+  if (!form) return;
+  var all = document.getElementById('pick-all'), out = document.getElementById('picked');
+  var boxes = function () { return Array.prototype.slice.call(form.querySelectorAll('.pick')); };
+  var count = function () { out.textContent = boxes().filter(function (b) { return b.checked; }).length; };
+  all.addEventListener('change', function () { boxes().forEach(function (b) { b.checked = all.checked; }); count(); });
+  boxes().forEach(function (b) { b.addEventListener('change', count); });
+  form.addEventListener('submit', function (e) {
+    var q = e.submitter && e.submitter.dataset.confirm;
+    if (q && !confirm(q)) e.preventDefault();
+  });
+})();
+
 (function () {
   var root = document.documentElement;
 

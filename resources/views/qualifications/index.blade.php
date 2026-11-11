@@ -65,6 +65,9 @@
     @empty
       <p class="empty">No ad names both a level and a subject yet.</p>
     @endforelse
+    @if ($labelsTotal > $labels->count())
+      <p style="margin:14px 0 0"><a class="btn sm" href="{{ route('qualifications.all', ['panel' => 'qualifications'] + array_filter($filters)) }}">View all {{ number_format($labelsTotal) }}</a></p>
+    @endif
   </div>
 </section>
 
@@ -77,6 +80,9 @@
     @empty
       <p class="empty">No field of study was read yet.</p>
     @endforelse
+    @if ($fieldsTotal > $fields->count())
+      <p style="margin:14px 0 0"><a class="btn sm" href="{{ route('qualifications.all', ['panel' => 'fields'] + array_filter($filters)) }}">View all {{ number_format($fieldsTotal) }}</a></p>
+    @endif
   </div>
 
   <div class="card">
@@ -87,6 +93,9 @@
     @empty
       <p class="empty">No length of experience was read yet.</p>
     @endforelse
+    @if ($experienceTotal > $experience->count())
+      <p style="margin:14px 0 0"><a class="btn sm" href="{{ route('qualifications.all', ['panel' => 'experience'] + array_filter($filters)) }}">View all {{ number_format($experienceTotal) }}</a></p>
+    @endif
   </div>
 </section>
 
@@ -98,6 +107,9 @@
   @empty
     <p class="empty" style="text-align:left">No skill has been read as required or preferred in an analysed vacancy yet.</p>
   @endforelse
+  @if ($skillsTotal > $skills->count())
+    <p style="margin:14px 0 0"><a class="btn sm" href="{{ route('qualifications.all', ['panel' => 'skills'] + array_filter($filters)) }}">View all {{ number_format($skillsTotal) }}</a></p>
+  @endif
 </section>
 @endif
 @endsection

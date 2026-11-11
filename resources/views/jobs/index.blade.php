@@ -27,12 +27,23 @@
     @if (array_filter($filters))<a class="btn" href="{{ route('jobs.index') }}">Clear</a>@endif
   </form>
 
+  <form method="POST" action="{{ route('jobs.decideMany') }}" id="bulk">
+  @csrf
+  @error('jobs')<div class="alert warn">{{ $message }}</div>@enderror
+  @error('reason')<div class="alert warn">{{ $message }}</div>@enderror
+  <div class="btns" style="margin-bottom:12px">
+    <span class="mut"><span id="picked">0</span> ticked</span>
+    <input type="text" name="reason" maxlength="255" placeholder="Reason (optional)" aria-label="Reason" style="min-width:16rem">
+    <button class="btn primary sm" type="submit" name="status" value="published">Publish ticked</button>
+    <button class="btn danger sm" type="submit" name="status" value="rejected" data-confirm="Reject all ticked jobs?">Reject ticked</button>
+  </div>
   <div class="tw">
   <table class="tbl">
-    <thead><tr><th>Job</th><th>Employer</th><th>Place</th><th>Closes</th><th>Status</th><th>Source</th><th>Confidence</th></tr></thead>
+    <thead><tr><th style="width:1%"><input type="checkbox" id="pick-all" aria-label="Tick all jobs on this page"></th><th>Job</th><th>Employer</th><th>Place</th><th>Closes</th><th>Status</th><th>Source</th><th>Confidence</th></tr></thead>
     <tbody>
     @forelse ($jobs as $job)
       <tr>
+        <td>@if ($job->status !== 'duplicate')<input type="checkbox" class="pick" name="jobs[]" value="{{ $job->id }}" aria-label="Tick {{ $job->title }}">@endif</td>
         <td><a class="name" href="{{ route('jobs.show', $job) }}">{{ $job->title }}</a>
           @if ($job->review_status === 'needs_review')<div><span class="pill warn">Needs review</span></div>@endif</td>
         <td>{{ $job->employer_text ?? '-' }}</td>
@@ -43,11 +54,12 @@
         <td class="nowrap">{{ $job->confidence }}</td>
       </tr>
     @empty
-      <tr><td colspan="7" class="empty">No jobs yet. They appear once processing is switched on and ads have been collected.</td></tr>
+      <tr><td colspan="8" class="empty">No jobs yet. They appear once processing is switched on and ads have been collected.</td></tr>
     @endforelse
     </tbody>
   </table>
   </div>
+  </form>
   {{ $jobs->links() }}
 </section>
 @endsection

@@ -43,6 +43,7 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
     Route::get('/runs/{run}', [RunController::class, 'show'])->name('runs.show');
 
     Route::get('/qualifications', [QualificationController::class, 'index'])->name('qualifications.index');
+    Route::get('/qualifications/all/{panel}', [QualificationController::class, 'all'])->whereIn('panel', ['qualifications', 'fields', 'experience', 'skills'])->name('qualifications.all');
 
     Route::get('/insights', [InsightsController::class, 'index'])->name('insights.index');
     Route::get('/insights/export/{report}', [InsightsExportController::class, 'download'])->name('insights.export');
@@ -54,6 +55,7 @@ Route::middleware(['auth', 'admin', 'two-factor'])->group(function () {
     Route::get('/directory/{qualification}', [DirectoryController::class, 'show'])->whereNumber('qualification')->name('directory.show');
 
     Route::get('/jobs', [JobController::class, 'index'])->name('jobs.index');
+    Route::post('/jobs/decide', [JobController::class, 'decideMany'])->name('jobs.decideMany');
     Route::get('/jobs/{job}', [JobController::class, 'show'])->whereNumber('job')->name('jobs.show');
     Route::post('/jobs/{job}/status', [JobController::class, 'decide'])->whereNumber('job')->name('jobs.status');
     Route::post('/jobs/{job}/approve', [JobController::class, 'approve'])->whereNumber('job')->name('jobs.approve');
