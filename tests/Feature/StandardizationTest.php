@@ -576,6 +576,11 @@ class StandardizationTest extends TestCase
         $this->assertSame('Accounting', $job->fresh()->qualification_field);
     }
 
+    public function test_a_leading_article_is_not_part_of_the_subject(): void
+    {
+        $this->assertSame('Marketing', $this->job(['education' => 'Bachelor degree in a Marketing'])->qualification_field);
+    }
+
     public function test_filler_is_not_a_subject(): void
     {
         $job = $this->job(['education' => 'Bachelor degree in Another Relevant Discipline']);

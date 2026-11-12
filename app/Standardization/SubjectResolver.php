@@ -30,6 +30,7 @@ class SubjectResolver
             // "Accountancy will be a plus": the subject is what comes before the verb
             $part = preg_replace('/\s+(?:will|would|is|are|shall|should|must|may|can)\b.*$/iu', '', $part);
             $part = trim((string) preg_replace('/\s+/u', ' ', (string) $part), " \t.");
+            $part = preg_replace('/^(?:an?|the)\s+(?=\S)/iu', '', $part); // "a Marketing" is Marketing
             if ($part === '' || preg_match(self::FILLER, $part)) {
                 continue;
             }
