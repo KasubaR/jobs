@@ -46,7 +46,7 @@ class JobStatusTest extends TestCase
 
         $post = RawJobPost::create($ad + [
             'source_id' => $source->id, 'source_url' => "https://x.test/job-{$n}", 'raw_title' => 'Budget Analyst',
-            'raw_content' => 'Employer: Example Charity. '.str_repeat('Prepare budgets for the programme. ', 8),
+            'raw_content' => 'Employer: Example Charity. Qualification: Diploma in Accounting. '.str_repeat('Prepare budgets for the programme. ', 8),
             'structured_data' => $facts ?: null, 'content_hash' => hash('sha256', "j{$n}"),
             'fetched_at' => now(), 'first_seen_at' => now()->subDays(3), 'last_seen_at' => now(),
         ]);
@@ -68,6 +68,40 @@ class JobStatusTest extends TestCase
     {
         return DB::table('job_status_changes')->where('job_id', $job->id)->orderBy('id')->get()
             ->map(fn ($r) => [$r->from_status, $r->to_status])->all();
+    }
+
+    // ---- no qualification: never published without a person ----
+
+    private function blankQualification(): Job
+    {
+        return $this->job(['valid_through' => '2026-12-01', 'employer' => 'Example Charity'], ['raw_content' => 'Employer: Example Charity. '.str_repeat('Prepare budgets for the programme. ', 8)]);
+    }
+
+    public function test_an_ad_with_no_qualification_waits_for_a_person(): void
+    {
+        $job = $this->blankQualification();
+
+        $this->assertNull($job->qualification_level);
+        $this->assertSame('new', $job->status);
+        $this->assertSame('Waiting for review: no qualification was found in the ad.', $job->status_reason);
+
+        // the daily sweep does not publish it either
+        app(\App\Processing\JobStatusService::class)->sweep();
+        $this->assertSame('new', $job->fresh()->status);
+    }
+
+    public function test_marking_it_reviewed_or_publishing_it_releases_it(): void
+    {
+        $reviewed = $this->blankQualification();
+        $reviewed->update(['review_status' => 'reviewed']); // what "Mark as reviewed" does
+        app(\App\Processing\JobStatusService::class)->evaluate($reviewed->refresh());
+        $this->assertSame('published', $reviewed->fresh()->status);
+
+        $published = $this->blankQualification();
+        app(\App\Processing\JobStatusService::class)->decide($published, 'published');
+        $this->assertSame('published', $published->fresh()->status);
+        app(\App\Processing\JobStatusService::class)->sweep();
+        $this->assertSame('published', $published->fresh()->status); // the person's choice stands
     }
 
     // ---- from extraction ----
@@ -141,7 +175,7 @@ class JobStatusTest extends TestCase
 
         $v2 = RawJobPost::create([
             'source_id' => $job->rawPost->source_id, 'source_url' => 'https://x.test/same', 'raw_title' => 'Budget Analyst',
-            'raw_content' => 'Employer: Example Charity. '.str_repeat('Prepare budgets. ', 20), 'structured_data' => ['valid_through' => '2026-12-20'],
+            'raw_content' => 'Employer: Example Charity. Qualification: Diploma in Accounting. '.str_repeat('Prepare budgets. ', 20), 'structured_data' => ['valid_through' => '2026-12-20'],
             'content_hash' => hash('sha256', 'v2'), 'fetched_at' => now(), 'first_seen_at' => now(), 'last_seen_at' => now(),
         ]);
         ProcessRawJobPost::dispatchSync($v2->id);

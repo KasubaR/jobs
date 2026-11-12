@@ -257,6 +257,12 @@ body.auth{grid-template-columns:1fr;grid-template-rows:auto 1fr}
 }
 
 @media(max-width:1100px){.g4{grid-template-columns:1fr 1fr}.split,.split2,.g3{grid-template-columns:1fr}}
+/* several pages set their columns inline (style="grid-template-columns:1fr 1fr"), which beats the rule above: stack them on narrow screens too */
+@media(max-width:1100px){.split[style],.split2[style]{grid-template-columns:1fr!important}}
+.split>*,.split2>*{min-width:0}
+.rm .h b{min-width:0;overflow-wrap:anywhere}
+.filters select,.filters input{max-width:100%;min-width:0}
+@media(max-width:820px){.filters>select,.filters>input:not([type=checkbox]){flex:1 1 100%}.hd{flex-wrap:wrap}}
 @media(max-width:820px){
 .app{grid-template-columns:1fr}
 aside{position:fixed;z-index:30;width:260px;left:-280px;transition:left .25s;top:0}

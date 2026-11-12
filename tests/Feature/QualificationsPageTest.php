@@ -105,6 +105,23 @@ class QualificationsPageTest extends TestCase
         $r->assertSee("Bachelor's Degree")->assertSee('67%')->assertSee('33%');
     }
 
+    public function test_different_wordings_of_one_subject_count_together_and_filler_is_not_a_subject(): void
+    {
+        $this->signIn();
+        $this->vacancy('A', 'Alpha Ltd', ['education' => 'Degree in Accounting']);
+        $this->vacancy('B', 'Beta Ltd', ['education' => 'Degree in Accounts or Another Relevant Discipline']);
+        $this->vacancy('C', 'Gamma Ltd', ['education' => 'Degree in Accountancy will be a plus']);
+        $this->vacancy('D', 'Delta Ltd', ['education' => 'Degree in Sales & Marketing or PR']);
+        $this->vacancy('E', 'Eps Ltd', ['education' => 'Degree in Sales and Marketing, Public Relations or a similar technical qualification']);
+
+        $labels = $this->page()->assertOk()->viewData('fields')->pluck('n', 'name')->all();
+
+        $this->assertSame(3, $labels['Accounting']);
+        $this->assertSame(2, $labels['Marketing']);
+        $this->assertSame(2, $labels['Public Relations']);
+        $this->assertCount(3, $labels);
+    }
+
     public function test_a_list_of_subjects_counts_each_subject_once(): void
     {
         $this->signIn();
@@ -114,11 +131,12 @@ class QualificationsPageTest extends TestCase
         $r = $this->page()->assertOk();
 
         $labels = $r->viewData('labels')->pluck('n', 'name')->all();
-        $this->assertSame(2, $labels["Bachelor's Degree in Procurement"]);
-        foreach (['Supply Chain Management', 'Banking & Finance', 'Law', 'Engineering'] as $subject) {
+        // "Supply Chain Management" and "Procurement" are one known subject, counted once for the vacancy that names both
+        $this->assertSame(2, $labels["Bachelor's Degree in Procurement and Supply Chain Management"]);
+        foreach (['Banking', 'Law', 'Engineering'] as $subject) {
             $this->assertSame(1, $labels["Bachelor's Degree in {$subject}"], $subject);
         }
-        $this->assertSame(2, $r->viewData('fields')->pluck('n', 'name')->all()['Procurement']);
+        $this->assertSame(2, $r->viewData('fields')->pluck('n', 'name')->all()['Procurement and Supply Chain Management']);
         $this->assertSame(2, $r->viewData('labelsNamed'));
     }
 

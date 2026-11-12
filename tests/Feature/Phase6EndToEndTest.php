@@ -221,7 +221,11 @@ class Phase6EndToEndTest extends TestCase
         $thin = $this->job('a', 'URGENT: Accounts Clerk');
         $this->assertSame('new', $thin->status);
         $this->assertSame('needs_review', $thin->review_status);
-        $this->assertSame(['duplicate' => 1, 'expired' => 1, 'new' => 1, 'published' => 6, 'rejected' => 1], $this->statusCounts()); // 10 ads: 1 copy, 1 tender, 1 expired, 1 too thin to trust
+        // an ad that states no qualification is not published by itself (the board's Cook ad names none)
+        $cook = $this->job('a', 'Cook');
+        $this->assertSame('new', $cook->status);
+        $this->assertStringContainsString('no qualification', (string) $cook->status_reason);
+        $this->assertSame(['duplicate' => 1, 'expired' => 1, 'new' => 2, 'published' => 5, 'rejected' => 1], $this->statusCounts()); // 10 ads: 1 copy, 1 tender, 1 expired, 1 too thin to trust, 1 with no qualification
     }
 
     /** @return array<string, int> */

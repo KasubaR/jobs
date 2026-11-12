@@ -20,6 +20,12 @@ class DuplicateDetectionTest extends TestCase
 
     private array $s;
 
+    /** An ad that states no qualification waits for review, so these ads state one. */
+    protected function defaultFacts(): array
+    {
+        return ['education' => 'Bachelor degree in Mining Engineering'];
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -273,7 +279,7 @@ class DuplicateDetectionTest extends TestCase
         // the board edits the ad into a different job entirely
         $v2 = \App\Models\RawJobPost::create([
             'source_id' => $this->s['boardA']->id, 'source_url' => $board->source_url, 'raw_title' => 'Office Cleaner',
-            'raw_content' => '<p>'.self::cleanerBody().'</p>', 'structured_data' => ['employer' => 'Another Employer Ltd', 'valid_through' => '2026-12-20'],
+            'raw_content' => '<p>'.self::cleanerBody().'</p>', 'structured_data' => ['employer' => 'Another Employer Ltd', 'valid_through' => '2026-12-20', 'education' => 'Grade 12 certificate'],
             'content_hash' => hash('sha256', 'v2'), 'fetched_at' => now(), 'first_seen_at' => now(), 'last_seen_at' => now(),
         ]);
         ProcessRawJobPost::dispatchSync($v2->id);

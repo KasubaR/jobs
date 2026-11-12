@@ -543,6 +543,47 @@ class StandardizationTest extends TestCase
         $this->assertSame('Certificate in Driving', $later->qualification_label);
     }
 
+    public function test_a_known_subject_is_matched_and_an_unknown_one_waits_to_be_decided(): void
+    {
+        $this->signIn();
+        $a = $this->job(['education' => 'Bachelor degree in Accounts']);
+        $b = $this->job(['education' => 'Bachelor degree in Falconry Studies']);
+        $c = $this->job(['education' => 'Bachelor degree in Falconry studies']);
+
+        $this->assertSame('Accounting', $a->qualification_field);              // another spelling of a known subject
+        $this->assertSame('Bachelor\'s Degree in Accounting', $a->qualification_label);
+        $this->assertSame(0, DB::table('unrecognized_values')->where('job_id', $a->id)->where('kind', 'field')->count());
+        $this->assertSame('Falconry Studies', $b->qualification_field);       // kept as written until decided
+        $this->assertSame(2, (int) DB::table('unrecognized_values')->where('kind', 'field')->where('normalized', 'falconry studies')->count());
+
+        $this->post('/values', ['kind' => 'field', 'normalized' => 'falconry studies', 'action' => 'map', 'subject' => 'Agriculture'])
+            ->assertSessionHasNoErrors()->assertSessionHas('status', fn ($m) => str_contains($m, '2 jobs were updated'));
+
+        $this->assertSame('Agriculture', $b->fresh()->qualification_field);
+        $this->assertSame('Agriculture', $c->fresh()->qualification_field);
+        $this->assertSame(0, DB::table('unrecognized_values')->where('kind', 'field')->count());
+        $this->assertSame('Agriculture', $this->job(['education' => 'Bachelor degree in falconry studies'])->qualification_field); // remembered
+    }
+
+    public function test_a_subject_marked_not_applicable_is_dropped(): void
+    {
+        $this->signIn();
+        $job = $this->job(['education' => 'Bachelor degree in Basket Weaving or Accounting']);
+        $this->assertSame('Basket Weaving, Accounting', $job->qualification_field);
+
+        $this->post('/values', ['kind' => 'field', 'normalized' => 'basket weaving', 'action' => 'ignore']);
+
+        $this->assertSame('Accounting', $job->fresh()->qualification_field);
+    }
+
+    public function test_filler_is_not_a_subject(): void
+    {
+        $job = $this->job(['education' => 'Bachelor degree in Another Relevant Discipline']);
+
+        $this->assertNull($job->qualification_field);
+        $this->assertSame("Bachelor's Degree", $job->qualification_label);
+    }
+
     public function test_mapping_an_experience_a_type_and_a_place(): void
     {
         $this->signIn();

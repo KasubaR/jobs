@@ -38,6 +38,8 @@
                 @if ($kind === 'qualification')
                   <select name="level" aria-label="Level" required><option value="">Level…</option>@foreach ($levels as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select>
                   <input type="text" name="field" maxlength="120" placeholder="Field of study (optional)" aria-label="Field of study">
+                @elseif ($kind === 'field')
+                  <input type="text" name="subject" list="subjects" maxlength="120" placeholder="Which subject is this?" aria-label="Subject" required>
                 @elseif ($kind === 'experience')
                   <input type="number" name="min_years" step="0.5" min="0" max="60" placeholder="From (years)" aria-label="Minimum years" style="width:9rem" required>
                   <input type="number" name="max_years" step="0.5" min="0" max="60" placeholder="To (optional)" aria-label="Maximum years" style="width:9rem">
@@ -57,4 +59,5 @@
     </div>
   </section>
 @endforeach
+<datalist id="subjects">@foreach ($subjects as $name)<option value="{{ $name }}">@endforeach</datalist>
 @endsection

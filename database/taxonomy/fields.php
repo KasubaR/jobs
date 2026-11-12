@@ -33,8 +33,8 @@ return [
         'insurance' => ['Insurance', ['insurance', 'risk and insurance']],
     ]],
     'business-management' => ['Business and Management', ['business studies', 'business and management'], [
-        'business-administration' => ['Business Administration', ['business administration', 'business management', 'commerce']],
-        'marketing' => ['Marketing', ['marketing', 'marketing management']],
+        'business-administration' => ['Business Administration', ['business administration', 'business management', 'business', 'commerce']],
+        'marketing' => ['Marketing', ['marketing', 'marketing management', 'sales and marketing', 'marketing and sales']],
         'human-resource-management' => ['Human Resource Management', ['human resource management', 'human resources management', 'human resource', 'human resources', 'personnel management']],
         'project-management' => ['Project Management', ['project management']],
         'public-administration' => ['Public Administration', ['public administration', 'public management', 'public policy and administration']],
@@ -111,7 +111,7 @@ return [
         'land-surveying' => ['Land Surveying', ['land surveying', 'surveying', 'geomatics', 'geomatic engineering']],
         'urban-planning' => ['Urban and Regional Planning', ['urban and regional planning', 'urban planning', 'town planning', 'physical planning']],
         'construction-management' => ['Construction Management', ['construction management', 'construction technology', 'building technology', 'building construction']],
-        'land-management' => ['Land Management', ['land management', 'real estate', 'real estate management', 'property management', 'estate management']],
+        'land-management' => ['Land Management', ['land management', 'land economy', 'real estate', 'real estate management', 'property', 'property management', 'property studies', 'estate management']],
     ]],
     'social-sciences' => ['Social Sciences and Humanities', ['social sciences', 'humanities', 'social sciences and humanities'], [
         'economics' => ['Economics', ['economics', 'development economics']],
@@ -127,7 +127,7 @@ return [
     ]],
     'media-communication' => ['Media and Communication', ['media studies', 'media and communication'], [
         'journalism' => ['Journalism', ['journalism', 'mass communication', 'media and journalism']],
-        'public-relations' => ['Public Relations', ['public relations', 'communication studies', 'corporate communication']],
+        'public-relations' => ['Public Relations', ['public relations', 'pr', 'communication studies', 'communication science', 'communications', 'corporate communication']],
         'graphic-design' => ['Graphic Design', ['graphic design', 'multimedia', 'multimedia design']],
     ]],
     'supply-chain-logistics' => ['Supply Chain and Logistics', ['supply chain and logistics'], [

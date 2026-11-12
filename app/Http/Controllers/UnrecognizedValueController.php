@@ -16,6 +16,7 @@ class UnrecognizedValueController extends Controller
 {
     public const KINDS = [
         'qualification' => 'Qualifications',
+        'field' => 'Subjects (fields of study)',
         'experience' => 'Experience',
         'employment_type' => 'Job types',
         'location' => 'Places',
@@ -31,6 +32,7 @@ class UnrecognizedValueController extends Controller
             'kinds' => self::KINDS,
             'rows' => $rows,
             'levels' => collect(DefaultTerms::LEVELS)->map(fn ($l) => $l[0]),
+            'subjects' => DB::table('fields_of_study')->orderBy('name')->pluck('name'),
             'types' => DefaultTerms::EMPLOYMENT_TYPES,
             'places' => DB::table('locations')->orderBy('name')->get(['id', 'name', 'type']),
             'mapped' => DB::table('term_mappings')->where('origin', 'person')->count(),
@@ -75,6 +77,14 @@ class UnrecognizedValueController extends Controller
                 $name = DefaultTerms::LEVELS[$d['level']][0];
 
                 return [$field ? "{$name} in {$field}" : $name, ['level' => $d['level'], 'field' => $field]];
+
+            case 'field':
+                $d = $request->validate(['subject' => ['required', 'string', 'max:120']]);
+                $subject = trim(preg_replace('/\s+/u', ' ', $d['subject']));
+                // pick a known subject, or type a new one; a known subject keeps its own spelling
+                $known = DB::table('fields_of_study')->whereRaw('lower(name) = ?', [mb_strtolower($subject)])->value('name');
+
+                return [$known ?? $subject, []];
 
             case 'experience':
                 $d = $request->validate(['min_years' => ['required', 'numeric', 'min:0', 'max:60'], 'max_years' => ['nullable', 'numeric', 'gte:min_years', 'max:60']]);

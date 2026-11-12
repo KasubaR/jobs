@@ -108,7 +108,7 @@ class QualificationParser
         $subject = trim($subject, " \t,-:");
         $subject = trim(preg_replace('/\s+(?:etc|and\s+others)$/i', '', $subject), " ,");
 
-        if ($subject === '' || preg_match('/^(?:any|relevant|related|a\s+relevant|a\s+related)\b/i', $subject) || mb_strlen($subject) > 120) {
+        if ($subject === '' || preg_match('/^(?:any|another|other|relevant|related|similar|equivalent|a\s+(?:relevant|related|similar)|an?\s+(?:equivalent|appropriate|other))\b/i', $subject) || mb_strlen($subject) > 120) {
             return null;
         }
 

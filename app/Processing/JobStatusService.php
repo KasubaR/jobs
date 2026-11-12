@@ -18,7 +18,7 @@ use InvalidArgumentException;
  *   3. rejected (automatic)        the title says it is a tender or notice, not a vacancy
  *   4. expired                     the closing date is past; with no closing date, the assumed end is past
  *   5. closed                      the source lists every open ad and this one was missing from enough successful runs
- *   6. new                         too little found in the ad; waits for a person
+ *   6. new                         too little found in the ad, or no qualification found at all; waits for a person
  *   7. published                   everything else
  * A person's own decision (published, or new) overrides rules 3, 6 and 7, but never the dates (4) or the source (5).
  * Every change is written to job_status_changes with its reason.
@@ -67,7 +67,21 @@ class JobStatusService
             return $this->set($job, 'new', 'Waiting for review: too little could be read from the ad.');
         }
 
+        // An ad that states no qualification at all is never published by itself: a person looks at it first
+        // ("Mark as reviewed" or Publish releases it).
+        if ($job->review_status !== 'reviewed' && $this->noQualification($job)) {
+            return $this->set($job, 'new', 'Waiting for review: no qualification was found in the ad.');
+        }
+
         return $this->set($job, 'published', 'Passed the checks and no end date has passed.');
+    }
+
+    /** Nothing was read as a qualification, from a labelled line or from the whole ad. */
+    private function noQualification(Job $job): bool
+    {
+        return $job->qualification_level === null
+            && trim((string) $job->qualification_text) === ''
+            && ! DB::table('job_qualifications')->where('job_id', $job->id)->where('removed', false)->exists();
     }
 
     /** A person's decision (a later screen calls this). Dates and the source can still expire or close it. */

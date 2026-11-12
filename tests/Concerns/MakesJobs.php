@@ -21,6 +21,12 @@ trait MakesJobs
         return ['company' => $all[0]->fresh(), 'boardA' => $all[1]->fresh(), 'boardB' => $all[2]->fresh(), 'gov' => $all[3]->fresh()];
     }
 
+    /** More published facts every ad made by ad() gets; a test class that needs them overrides this. */
+    protected function defaultFacts(): array
+    {
+        return [];
+    }
+
     /** About 60 meaningful words, so the ad has a text fingerprint. $swap changes one word. */
     protected static function mineBody(?string $swap = null): string
     {
@@ -51,7 +57,7 @@ trait MakesJobs
         $facts = array_replace([
             'employer' => 'Sample Mining Ltd', 'locations' => [['locality' => 'Solwezi']],
             'valid_through' => '2026-12-15', 'date_posted' => '2026-11-01',
-        ], $facts);
+        ] + $this->defaultFacts(), $facts);
         $facts = array_filter($facts, fn ($v) => $v !== null);
 
         $post = RawJobPost::create($ad + [

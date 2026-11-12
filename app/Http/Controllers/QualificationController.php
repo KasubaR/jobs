@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Analytics\AdvertisedDemand;
 use App\Models\Job;
 use App\Standardization\DefaultTerms;
+use App\Standardization\SubjectResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,8 @@ class QualificationController extends Controller
 {
     /** How many rows each list on the main page shows; the full list is on its own page. */
     private const SHOWN = 5;
+
+    public function __construct(private SubjectResolver $subjects) {}
 
     /** The most rows any one list can have on its own page. */
     private const MOST = 500;
@@ -151,22 +154,14 @@ class QualificationController extends Controller
     }
 
     /**
-     * The separate subjects in a field of study. Commas, semicolons, "/" and " or " separate them; "and" and "&" do not,
-     * because "Banking & Finance" and "Science and Technology" are one subject each.
+     * The separate subjects in a field of study, each matched to a known subject (see SubjectResolver). Commas,
+     * semicolons, "/" and " or " separate them; "and" and "&" do not, because "Banking & Finance" is one subject.
      *
      * @return list<string>
      */
     private function subjects(string $field): array
     {
-        $seen = [];
-        foreach (preg_split('/\s*[,;\/]\s*(?:(?:or|and)\s+)?|\s+or\s+/iu', $field) as $part) {
-            $part = trim($part, " \t.");
-            if ($part !== '') {
-                $seen[mb_strtolower($part)] ??= mb_strtoupper(mb_substr($part, 0, 1)).mb_substr($part, 1);
-            }
-        }
-
-        return array_values($seen);
+        return array_column($this->subjects->resolve($field), 'name');
     }
 
     /** @param array<string, int> $counts @return Collection<int, array{name: string, n: int}> most requested first, then by name */

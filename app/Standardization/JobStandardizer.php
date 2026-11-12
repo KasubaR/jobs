@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 class JobStandardizer
 {
     /** Raised when the rules improve, so older jobs can be found and redone (jobs:standardize). */
-    public const VERSION = 1;
+    public const VERSION = 2;
 
     public function __construct(
         private TermDictionary $terms,
@@ -26,6 +26,7 @@ class JobStandardizer
         private LocationResolver $locations,
         private EmployerResolver $employers,
         private MatchingKeys $keys,
+        private SubjectResolver $subjects,
     ) {}
 
     public function standardize(Job $job, ?RawJobPost $post = null): void
@@ -48,6 +49,18 @@ class JobStandardizer
             $attrs['qualification_rank'] = $q['rank'];
             $attrs['qualification_label'] = $q['label'];
             $attrs['qualification_field'] = $q['field'];
+
+            // the subject is matched to the known fields of study; one that matches nothing waits on the Values page
+            if ($q['field'] !== null) {
+                $resolved = $this->subjects->resolve($q['field']);
+                $attrs['qualification_field'] = $resolved ? implode(', ', array_column($resolved, 'name')) : null;
+                $attrs['qualification_label'] = (DefaultTerms::LEVELS[$q['level']][0] ?? ucfirst((string) $q['level'])).($attrs['qualification_field'] ? " in {$attrs['qualification_field']}" : '');
+                foreach ($resolved as $subject) {
+                    if (! $subject['known']) {
+                        $note('field', $subject['key'], $subject['name'], 'unknown');
+                    }
+                }
+            }
         } elseif (in_array($q['status'], ['unknown', 'ambiguous'], true)) {
             $note('qualification', $q['key'], (string) $job->qualification_text, $q['status']);
         }
@@ -90,6 +103,7 @@ class JobStandardizer
     public function reapply(string $kind, string $normalized): int
     {
         $this->terms->flush();
+        $this->subjects->flush();
         $count = 0;
 
         foreach (DB::table('unrecognized_values')->where('kind', $kind)->where('normalized', $normalized)->pluck('job_id') as $id) {
